@@ -1,0 +1,28 @@
+Sample interaction for ElderCare AI – Voice Companion Agent
+
+1. User enters details:
+   Name: Margaret
+   Age: 78
+   Gender: Female
+   Mood: Lonely
+
+2. AI greets the user:
+   Hello Margaret! I am so glad you are here with me today. 😊
+
+3. User starts a conversation:
+   User: I am feeling lonely today.
+
+4. AI provides a supportive response:
+   Thank you for sharing that with me. I am here to listen and support you.
+   You deserve companionship, and I am happy to stay with you for a while.
+
+5. Wellness suggestions are displayed:
+   - Call a family member or friend.
+   - Take a short walk outside.
+   - Read a favorite book or listen to a story.
+
+6. Motivation quote is generated:
+   Small steps still move you forward. Keep going.
+
+7. Conversation history is updated:
+   Time | User Message | AI Response
