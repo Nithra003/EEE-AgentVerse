@@ -1,0 +1,37 @@
+Sample Prescription Explainer Output
+==================================
+Patient enters:
+- Patient Name: Mrs. Sharma
+- Age: 72
+- Medicine: Paracetamol
+- Dosage: 500 mg
+- Frequency: Twice daily
+- Food: After food
+- Duration: 5 days
+- Condition: Fever
+
+Medicine explanation shown:
+- Purpose: Helps reduce fever and body pain.
+- How to take: Take one tablet after food with water.
+- Duration: 5 days.
+
+Precautions shown:
+- Do not take more than the recommended amount.
+- Avoid alcohol while using this medicine.
+- Store in a cool, dry place.
+
+Possible side effects shown:
+- Mild stomach upset
+- Sleepiness
+- Nausea
+
+Summary generated:
+- Patient Name: Mrs. Sharma
+- Medicine: Paracetamol 500 mg
+- Dosage: 500 mg
+- Timing: Twice daily
+- Duration: 5 days
+- Purpose: Helps reduce fever and body pain.
+
+Download confirmation:
+- Summary saved as a text file.
