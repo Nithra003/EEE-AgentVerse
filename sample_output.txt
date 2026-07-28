@@ -1,0 +1,44 @@
+=========================================
+HEALTH REPORT
+=========================================
+
+Patient
+-------
+Name : John
+Age  : 72
+
+Health Metrics
+--------------
+Heart Rate      : 108 bpm
+SpO2            : 91%
+Temperature     : 38.4 °C
+Blood Pressure  : 150/95
+Steps           : 1800
+Sleep Hours     : 5.0
+
+Analysis
+--------
+Heart Rate      : High
+SpO2            : Low
+Temperature     : Fever
+Blood Pressure  : High
+Activity        : Low Activity
+Sleep Quality   : Fair
+
+Overall Status
+--------------
+Health Status : Needs Monitoring
+Risk Level    : Medium
+
+Recommendations
+---------------
+✓ Monitor blood pressure.
+✓ Increase daily walking.
+✓ Improve sleep schedule.
+✓ Drink enough water.
+
+Timestamp
+---------
+2026-07-28 10:30 AM
+
+=========================================
