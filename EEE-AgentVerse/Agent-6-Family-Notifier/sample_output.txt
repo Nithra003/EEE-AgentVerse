@@ -1,0 +1,49 @@
+==================================================
+   ELDERCARE AI – SAMPLE OUTPUT DEMONSTRATION
+==================================================
+
+STEP 1 – Emergency Detected
+--------------------------------------------------
+Patient Name     : Rajamani Krishnan
+Age              : 72
+Emergency Type   : Fall Detected
+Location         : 12, Anna Nagar, Chennai
+Priority Level   : Critical
+
+STEP 2 – Family Notification Generated
+--------------------------------------------------
+Contact Person   : Karthik Rajamani
+Relationship     : Son
+Contact Number   : 9876543210
+Date & Time      : 2025-07-15 at 14:32:10
+
+STEP 3 – Notification Channels Simulated
+--------------------------------------------------
+📩 SMS sent successfully to emergency contact.
+📧 Email notification dispatched.
+📞 Emergency contact notified via call simulation.
+🚑 Emergency services can now be contacted.
+
+STEP 4 – Emergency Summary Displayed
+--------------------------------------------------
+Patient          : Rajamani Krishnan
+Emergency        : Fall Detected
+Location         : 12, Anna Nagar, Chennai
+Contact Person   : Karthik Rajamani
+Contact Number   : 9876543210
+Priority         : 🚨 Critical
+Status           : Sent
+
+STEP 5 – Notification History Updated
+--------------------------------------------------
+Date        Time      Patient             Emergency      Priority  Contact           Status
+2025-07-15  14:32:10  Rajamani Krishnan   Fall Detected  Critical  Karthik Rajamani  Delivered
+
+STEP 6 – Report Downloaded Successfully
+--------------------------------------------------
+File saved as: emergency_report_2025-07-15_14-32-10.txt
+✅ Download complete.
+
+==================================================
+         ElderCare AI – Powered by AgentVerse
+==================================================

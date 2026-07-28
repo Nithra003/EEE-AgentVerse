@@ -1,0 +1,28 @@
+==================================================
+   ELDERCARE AI – EXERCISE COACH SAMPLE OUTPUT
+==================================================
+
+Patient       : Murugan | Age: 70 | Beginner
+Condition     : High Blood Pressure
+
+✅ Exercise Plan Generated!
+
+Plan          : Low-intensity aerobic exercises to reduce BP
+Intensity     : Low-Moderate | Duration: 30 minutes/day
+
+EXERCISES:
+  • Slow Walking – 20 min | Lowers BP naturally
+  • Seated Yoga – 10 min | Reduces stress & BP
+  • Neck Stretches – 3x10 reps | Relieves tension
+  • Diaphragmatic Breathing – 5 min | Calms nervous system
+  • Gentle Tai Chi – 10 min | Balance & relaxation
+
+PRECAUTIONS:
+  ⚠ Avoid heavy lifting
+  ⚠ No breath-holding during exercise
+  ⚠ Stop if BP > 180/110
+
+💡 Tip: 30 min daily walk reduces BP by 5-8 mmHg.
+
+📥 Report downloaded: exercise_plan_Murugan.txt
+==================================================

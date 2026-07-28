@@ -1,0 +1,30 @@
+==================================================
+   ELDERCARE AI – MOOD COMPANION SAMPLE OUTPUT
+==================================================
+
+Name     : Kamala Paati | Age: 68
+Mood     : 😔 Sad
+
+💙 Hello Kamala Paati! Here's your personalised support.
+
+Message  : It's okay to feel sad sometimes. You are not alone. 💙
+
+SUGGESTED ACTIVITIES:
+  • 🫂 Talk to a family member or trusted friend
+  • 🎵 Listen to soft, calming music
+  • 🌸 Sit near a window and enjoy natural light
+  • 🍵 Make yourself a warm cup of tea or milk
+  • 📖 Read a comforting book or watch a light movie
+
+💬 Affirmation: Every storm passes. Brighter days are ahead for you.
+💡 Tip        : Don't hesitate to reach out to family – they care about you.
+
+🧘 Box Breathing Exercise:
+  1. Sit comfortably and close your eyes.
+  2. Inhale slowly for 4 counts.
+  3. Hold for 4 counts.
+  4. Exhale slowly for 4 counts.
+  5. Hold for 4 counts. Repeat 4 times.
+
+📥 Report downloaded: mood_report_Kamala_Paati.txt
+==================================================

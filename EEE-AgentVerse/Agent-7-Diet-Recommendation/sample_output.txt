@@ -1,0 +1,25 @@
+==================================================
+   ELDERCARE AI – DIET RECOMMENDATION SAMPLE OUTPUT
+==================================================
+
+Patient  : Rajamani Krishnan | Age: 68 | Male
+Weight   : 78 kg | Height: 165 cm
+BMI      : 28.7 → Overweight
+Condition: High Blood Pressure
+
+✅ Diet Plan Generated!
+
+MEAL PLAN:
+  Breakfast     : Oats with banana + low-fat milk
+  Mid-Morning   : Coconut water or buttermilk (no salt)
+  Lunch         : 2 rotis + spinach dal + salad (no salt)
+  Evening Snack : Handful of unsalted nuts
+  Dinner        : Brown rice + fish curry (low salt) + vegetables
+
+Foods to Eat  : Bananas, Spinach, Garlic, Oats, Fish...
+Foods to Avoid: Salt, Processed meats, Fried snacks...
+Water Intake  : 8 glasses per day
+💡 Tip        : Reduce salt intake to less than 1500mg per day.
+
+📥 Report downloaded: diet_report_Rajamani_Krishnan.txt
+==================================================
