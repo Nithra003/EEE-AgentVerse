@@ -20,31 +20,27 @@ def _add(path):
 def tool_medicine_reminder(message: str, ctx: dict) -> str:
     try:
         _add("Agent-1-Medicine-Reminder")
-        from agents.medicine_reminder import MedicineReminderAgent
-        result = MedicineReminderAgent().generate_response(
-            patient_name     = ctx.get("name", "Friend"),
-            medicine_name    = ctx.get("medicine", "your medicine"),
-            dosage           = ctx.get("dosage", "as prescribed"),
-            scheduled_time   = ctx.get("med_time", "the scheduled time"),
-            patient_response = message or ctx.get("response", ""),
+        from agents.medicine_reminder import chat as med_chat
+        name     = ctx.get("name", "Friend")
+        medicine = ctx.get("medicine", "your medicine")
+        dosage   = ctx.get("dosage", "as prescribed")
+        time     = ctx.get("med_time", "scheduled time")
+        response = message or ctx.get("response", "")
+        prompt = (
+            f"Patient: {name}. Medicine: {medicine}, Dosage: {dosage}, Time: {time}. "
+            f"Patient response: '{response}'. "
+            "Give a warm reminder message, state if taken/missed/reminded, and food instruction."
         )
-        return (
-            f"Medicine Reminder for {ctx.get('name', 'you')}\n\n"
-            f"{result['message_to_patient']}\n\n"
-            f"Status   : {result['status'].upper()}\n"
-            f"Medicine : {ctx.get('medicine', 'your medicine')}\n"
-            f"Dosage   : {ctx.get('dosage', 'as prescribed')}\n"
-            f"Time     : {ctx.get('med_time', 'scheduled time')}\n\n"
-            f"Please take your medicine regularly and consult your doctor if you have any concerns."
-        )
-    except Exception:
+        reply = med_chat([], prompt)
+        return f"💊 Medicine Reminder for {name}\n\n{reply}"
+    except Exception as e:
         name = ctx.get("name", "Friend")
         med  = ctx.get("medicine", "your medicine")
         return (
             f"Medicine Reminder for {name}\n\n"
-            f"This is a reminder to take {med} — {ctx.get('dosage','as prescribed')} "
+            f"Please take {med} — {ctx.get('dosage','as prescribed')} "
             f"at {ctx.get('med_time','the scheduled time')}.\n\n"
-            f"Please take your medicine on time. If you missed a dose, consult your doctor."
+            f"Consult your doctor if you have any concerns."
         )
 
 

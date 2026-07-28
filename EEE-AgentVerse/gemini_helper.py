@@ -21,7 +21,7 @@ if _api_key:
         try:
             import google.generativeai as genai_old
             genai_old.configure(api_key=_api_key)
-            _model = genai_old.GenerativeModel("gemini-1.5-flash")
+            _model = genai_old.GenerativeModel("gemini-2.0-flash")
             _client = "legacy"
         except Exception:
             pass

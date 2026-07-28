@@ -1,0 +1,18 @@
+{
+  "niharika": {
+    "password": "0d77f39051c6240b7e33e0f69f7cc5c607c5ad55d4b47e182887eb7dd18aec00",
+    "name": "nithya",
+    "age": 60,
+    "phone": "8989898989",
+    "medicines": [
+      {
+        "name": "Dolo",
+        "dosage": "1",
+        "time": "10.17 PM",
+        "food": "before sleep"
+      }
+    ],
+    "dose_log": [],
+    "created": "2026-07-28"
+  }
+}

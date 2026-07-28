@@ -13,10 +13,10 @@ cd /d "%~dp0"
 
 echo [1/11] Starting Dashboard (port 8500)...
 start "Dashboard" cmd /k "streamlit run dashboard.py --server.port 8500 --server.address 0.0.0.0 --server.headless true"
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 
 echo [2/11] Starting Agent-1 Medicine Reminder (port 8501)...
-start "Agent-1 Medicine Reminder" cmd /k "cd Agent-1-Medicine-Reminder && streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true"
+start "Agent-1 Medicine Reminder" cmd /k "cd /d "%~dp0Agent-1-Medicine-Reminder" && streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true"
 timeout /t 2 /nobreak >nul
 
 echo [3/11] Starting Agent-2 Emergency Detection (port 8502)...

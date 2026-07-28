@@ -348,7 +348,7 @@ st.markdown("""
 
 <div class="grid">
 
-  <a class="agent-card" href="http://localhost:8501" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8501" target="_blank">
     <div class="agent-icon">💊</div>
     <div class="agent-num">Agent 01</div>
     <div class="agent-name">Medicine Reminder</div>
@@ -356,7 +356,7 @@ st.markdown("""
     <div class="agent-port">:8501</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8502" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8502" target="_blank">
     <div class="agent-icon">🚨</div>
     <div class="agent-num">Agent 02</div>
     <div class="agent-name">Emergency Detection</div>
@@ -364,7 +364,7 @@ st.markdown("""
     <div class="agent-port">:8502</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8503" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8503" target="_blank">
     <div class="agent-icon">📅</div>
     <div class="agent-num">Agent 03</div>
     <div class="agent-name">Appointment Booking</div>
@@ -372,7 +372,7 @@ st.markdown("""
     <div class="agent-port">:8503</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8504" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8504" target="_blank">
     <div class="agent-icon">📋</div>
     <div class="agent-num">Agent 04</div>
     <div class="agent-name">Prescription Explainer</div>
@@ -380,7 +380,7 @@ st.markdown("""
     <div class="agent-port">:8504</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8505" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8505" target="_blank">
     <div class="agent-icon">📊</div>
     <div class="agent-num">Agent 05</div>
     <div class="agent-name">Health Report</div>
@@ -388,7 +388,7 @@ st.markdown("""
     <div class="agent-port">:8505</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8506" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8506" target="_blank">
     <div class="agent-icon">📣</div>
     <div class="agent-num">Agent 06</div>
     <div class="agent-name">Family Notifier</div>
@@ -396,7 +396,7 @@ st.markdown("""
     <div class="agent-port">:8506</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8507" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8507" target="_blank">
     <div class="agent-icon">🥗</div>
     <div class="agent-num">Agent 07</div>
     <div class="agent-name">Diet Recommendation</div>
@@ -404,7 +404,7 @@ st.markdown("""
     <div class="agent-port">:8507</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8508" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8508" target="_blank">
     <div class="agent-icon">🏃</div>
     <div class="agent-num">Agent 08</div>
     <div class="agent-name">Exercise Coach</div>
@@ -412,7 +412,7 @@ st.markdown("""
     <div class="agent-port">:8508</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8509" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8509" target="_blank">
     <div class="agent-icon">🧠</div>
     <div class="agent-num">Agent 09</div>
     <div class="agent-name">Mood Companion</div>
@@ -420,7 +420,7 @@ st.markdown("""
     <div class="agent-port">:8509</div>
   </a>
 
-  <a class="agent-card" href="http://localhost:8510" target="_blank">
+  <a class="agent-card" href="http://172.16.161.187:8510" target="_blank">
     <div class="agent-icon">🎙</div>
     <div class="agent-num">Agent 10</div>
     <div class="agent-name">Voice Assistant</div>

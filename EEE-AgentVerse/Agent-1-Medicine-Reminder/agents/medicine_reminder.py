@@ -6,10 +6,13 @@ from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Load from Agent folder first, fallback to root folder
+_agent_env = Path(__file__).resolve().parent.parent / ".env"
+_root_env  = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(_agent_env if _agent_env.exists() else _root_env)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
-MODEL = "gemini-1.5-flash"
+MODEL = "gemini-2.0-flash"
 
 SYSTEM = """You are MediCare AI, a warm and intelligent medicine reminder assistant for elderly patients.
 You help with:
@@ -43,19 +46,22 @@ def chat(history: list[dict], user_msg: str) -> str:
     except Exception as e:
         return f"⚠️ AI unavailable: {e}"
 
-def verify_medicine_image(image_bytes: bytes, scheduled_medicine: str) -> str:
+def verify_medicine_image(image_bytes: bytes, scheduled_medicine: str, mime_type: str = "image/jpeg") -> str:
     """Use Gemini Vision to identify medicine from photo and verify against schedule."""
     try:
-        img_part = {"mime_type": "image/jpeg", "data": base64.b64encode(image_bytes).decode()}
+        import PIL.Image
+        import io
+        img = PIL.Image.open(io.BytesIO(image_bytes))
         prompt = (
-            f"Look at this medicine image. Identify the medicine name, dosage, and type if visible. "
+            f"Look at this medicine image carefully. Read any text on the label or strip. "
+            f"Identify the medicine name, dosage, and type. "
             f"Then check if it matches '{scheduled_medicine}'. "
-            "Reply in this format:\n"
-            "**Identified:** <medicine name or 'Cannot identify clearly'>\n"
+            "Reply in this exact format:\n"
+            "**Identified:** <medicine name and dosage>\n"
             "**Match:** ✅ Yes / ❌ No / ⚠️ Uncertain\n"
-            "**Note:** <brief advice>"
+            "**Note:** <one line advice>"
         )
-        resp = _model().generate_content([prompt, img_part])
+        resp = _model().generate_content([prompt, img])
         return resp.text.strip()
     except Exception as e:
         return f"⚠️ Image analysis failed: {e}"

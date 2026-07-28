@@ -1,290 +1,512 @@
-"""💊 Medicine Reminder AI Agent — ElderCare AgentVerse"""
+"""💊 Medicine Reminder AI Agent — Login + Personal Profile"""
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import datetime
-from medicine_db import (
-    get_medicine, get_generic, log_dose, get_adherence,
-    get_todays_log, check_missed_count
-)
+import users
 from agents.medicine_reminder import chat, verify_medicine_image, analyze_missed_dose, get_voice_reminder_text
 
 st.set_page_config(page_title="💊 Medicine Reminder AI", layout="wide", page_icon="💊")
 
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+* { font-family: 'Inter', sans-serif; }
 [data-testid="stAppViewContainer"] { background: #f0f4f8; }
+[data-testid="stHeader"] { display: none; }
+
+.login-box {
+    max-width: 420px; margin: 3rem auto;
+    background: white; border-radius: 16px;
+    padding: 2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+}
+.login-title { text-align:center; font-size:1.5rem; font-weight:700; color:#1a3c5e; margin-bottom:0.3rem; }
+.login-sub   { text-align:center; font-size:0.85rem; color:#64748b; margin-bottom:1.5rem; }
+
 .header-box {
     background: linear-gradient(135deg, #1a3c5e, #2d6a9f);
-    color: white; padding: 1.2rem 1.8rem; border-radius: 12px; margin-bottom: 1rem;
+    color: white; padding: 1rem 1.5rem; border-radius: 12px;
+    margin-bottom: 1rem; display:flex; justify-content:space-between; align-items:center;
 }
-.header-box h1 { margin: 0; font-size: 1.6rem; }
-.header-box p  { margin: 0.3rem 0 0; opacity: 0.85; font-size: 0.95rem; }
+.header-box h1 { margin:0; font-size:1.3rem; }
+.header-box p  { margin:0; font-size:0.82rem; opacity:0.85; }
+
+.med-card {
+    background: white; border-radius: 10px; padding: 0.8rem 1rem;
+    margin-bottom: 0.5rem; border-left: 4px solid #2d6a9f;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    display: flex; align-items: center; justify-content: space-between;
+}
 .metric-card {
     background: white; border-radius: 10px; padding: 1rem;
     text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 .voice-box {
     background: #e8f4fd; border-left: 4px solid #2d6a9f;
-    padding: 1rem; border-radius: 8px; font-size: 1.05rem;
+    padding: 0.8rem 1rem; border-radius: 8px; font-size: 0.95rem;
 }
 .alert-box {
     background: #fff3cd; border-left: 4px solid #ffc107;
-    padding: 0.8rem; border-radius: 8px;
+    padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 0.4rem;
+    font-size: 0.88rem;
 }
-.emergency-box {
-    background: #fde8e8; border-left: 4px solid #e53e3e;
-    padding: 0.8rem; border-radius: 8px;
-}
+.stButton > button { border-radius: 8px !important; font-weight: 500 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<div class="header-box">
-    <h1>💊 Medicine Reminder AI Agent</h1>
-    <p>ElderCare AI · Smart Medicine Management · AgentVerse Hackathon</p>
-</div>
-""", unsafe_allow_html=True)
+# ── Session init ──────────────────────────────────────────────────────────────
+for k, v in {"logged_in": False, "username": "", "page": "login",
+              "chat_history": [], "caregiver_alerts": [], "edit_med_idx": None}.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-# ── Session state init ────────────────────────────────────────────────────────
-def _init():
-    defaults = {
-        "chat_history": [],
-        "patient": "Rajan",
-        "medicines": [
-            {"name": "Metformin",   "dosage": "500mg", "time": "8:00 AM",  "food": "after food"},
-            {"name": "Amlodipine",  "dosage": "5mg",   "time": "9:00 AM",  "food": "any time"},
-            {"name": "Vitamin D",   "dosage": "1 tab", "time": "1:00 PM",  "food": "after lunch"},
-            {"name": "Omeprazole",  "dosage": "20mg",  "time": "7:30 AM",  "food": "before food"},
-        ],
-        "reminder_sent": {},
-        "caregiver_alerts": [],
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
+def speak(text: str):
+    safe = text.replace("'", " ").replace('"', " ").replace("\n", " ")
+    safe = safe.encode("ascii", "ignore").decode("ascii")
+    components.html(f"""
+    <script>
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance('{safe}');
+    u.rate=0.85; u.pitch=1.0; u.volume=1.0;
+    window.speechSynthesis.speak(u);
+    </script>""", height=0)
 
-_init()
-
-tab1, tab2, tab3 = st.tabs(["🤖 AI Chat & Reminders", "📊 Dashboard", "📸 Verify Medicine"])
+def set_voice_timer(hhmm: str, speak_txt: str, r_type: str, r_date: str):
+    safe = speak_txt.replace("'", " ").replace('"', " ").replace("\n", " ")
+    # remove non-ascii to avoid surrogate errors
+    safe = safe.encode("ascii", "ignore").decode("ascii")
+    components.html(f"""
+    <script>
+    (function(){{
+        var target='{hhmm}', rtype='{r_type}', rdate='{r_date}';
+        function check(){{
+            var now=new Date();
+            var hh=String(now.getHours()).padStart(2,'0');
+            var mm=String(now.getMinutes()).padStart(2,'0');
+            var dd=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+            var tMatch=(hh+':'+mm===target);
+            var dMatch=(rtype==='Daily')||(dd===rdate);
+            if(tMatch && dMatch){{
+                window.speechSynthesis.cancel();
+                var u=new SpeechSynthesisUtterance('{safe}');
+                u.rate=0.85; u.volume=1.0;
+                window.speechSynthesis.speak(u);
+                alert('Medicine Reminder\\n\\n{safe}');
+                if(rtype==='Daily') setTimeout(check,86400000);
+            }} else {{ setTimeout(check,20000); }}
+        }}
+        setTimeout(check,10000);
+    }})();
+    </script>
+    <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:8px;
+                padding:0.7rem 1rem;font-size:0.85rem;color:#155724;">
+        Reminder set at <b>{hhmm}</b> | {r_type} - Keep this tab open!
+    </div>""", height=48)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — AI Chat + Smart Reminders + Voice + Food + Emergency
+# LOGIN / REGISTER PAGE
 # ══════════════════════════════════════════════════════════════════════════════
-with tab1:
+if not st.session_state.logged_in:
+    st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">💊 Medicine Reminder AI</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-sub">ElderCare AI · AgentVerse Hackathon</div>', unsafe_allow_html=True)
+
+    tab_login, tab_reg = st.tabs(["🔐 Login", "📝 Register"])
+
+    with tab_login:
+        u = st.text_input("Username", key="li_u")
+        p = st.text_input("Password", type="password", key="li_p")
+        if st.button("Login", use_container_width=True, type="primary"):
+            ok, result = users.login(u.strip(), p)
+            if ok:
+                st.session_state.logged_in = True
+                st.session_state.username  = u.strip().lower()
+                st.session_state.page      = "home"
+                st.session_state.chat_history = []
+                st.rerun()
+            else:
+                st.error(result)
+
+    with tab_reg:
+        ru   = st.text_input("Username",     key="rg_u")
+        rn   = st.text_input("Full Name",    key="rg_n")
+        rage = st.number_input("Age", 1, 120, 60, key="rg_a")
+        rph  = st.text_input("Phone Number", key="rg_ph")
+        rp   = st.text_input("Password",     type="password", key="rg_p")
+        rp2  = st.text_input("Confirm Password", type="password", key="rg_p2")
+        if st.button("Register", use_container_width=True, type="primary"):
+            if rp != rp2:
+                st.error("Passwords do not match.")
+            elif len(ru.strip()) < 3:
+                st.error("Username must be at least 3 characters.")
+            else:
+                ok, msg = users.register(ru.strip(), rp, rn.strip(), int(rage), rph.strip())
+                if ok:
+                    st.success("✅ Registered! Please login.")
+                else:
+                    st.error(msg)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGGED IN — load user
+# ══════════════════════════════════════════════════════════════════════════════
+user     = users.get_user(st.session_state.username)
+uname    = st.session_state.username
+medicines = user.get("medicines", [])
+
+# ── Header ────────────────────────────────────────────────────────────────────
+col_h1, col_h2 = st.columns([5, 1])
+with col_h1:
+    st.markdown(f"""
+    <div class="header-box">
+        <div>
+            <h1>💊 Medicine Reminder AI</h1>
+            <p>Welcome, {user['name']} · Age {user['age']} · ElderCare AI</p>
+        </div>
+    </div>""", unsafe_allow_html=True)
+with col_h2:
+    if st.button("🚪 Logout", use_container_width=True):
+        for k in ["logged_in","username","page","chat_history","caregiver_alerts","edit_med_idx"]:
+            st.session_state[k] = False if k == "logged_in" else ("" if k in ["username","page"] else [])
+        st.session_state.page = "login"
+        st.rerun()
+
+# ── Nav ───────────────────────────────────────────────────────────────────────
+pages = ["🏠 Home", "💊 My Medicines", "⏰ Reminders", "📊 Dashboard", "📸 Verify", "👤 Profile"]
+cols  = st.columns(len(pages))
+for i, pg in enumerate(pages):
+    if cols[i].button(pg, use_container_width=True):
+        st.session_state.page = pg
+        st.rerun()
+
+st.divider()
+
+page = st.session_state.page
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: HOME — AI Chat + Today's Schedule
+# ══════════════════════════════════════════════════════════════════════════════
+if page in ["home", "🏠 Home"]:
     col_left, col_right = st.columns([2, 1])
 
     with col_left:
         st.subheader("🤖 AI Medicine Assistant")
 
-        # ── Today's reminders ─────────────────────────────────────────────
-        st.markdown("#### 🔔 Today's Medicine Schedule")
-        today_log = get_todays_log(st.session_state.patient)
+        # Today's schedule
+        today_log   = users.get_todays_log(uname)
         taken_today = {l["medicine"].lower() for l in today_log if l["status"] == "taken"}
 
-        for med in st.session_state.medicines:
-            mname = med["name"]
-            mkey  = mname.lower()
-            col_a, col_b, col_c = st.columns([3, 1, 1])
-            status_icon = "✅" if mkey in taken_today else "⏰"
-            col_a.markdown(f"{status_icon} **{mname}** — {med['dosage']} at {med['time']} _{med['food']}_")
-
-            if mkey not in taken_today:
-                if col_b.button("✅ Taken", key=f"taken_{mkey}"):
-                    log_dose(st.session_state.patient, mname, "taken")
-                    st.session_state.chat_history.append({
-                        "role": "assistant",
-                        "content": f"✅ Great job, {st.session_state.patient}! I've recorded that you took **{mname}**. Keep it up! 💪"
-                    })
-                    st.rerun()
-                if col_c.button("❌ Missed", key=f"missed_{mkey}"):
-                    missed_n = check_missed_count(st.session_state.patient, mname) + 1
-                    log_dose(st.session_state.patient, mname, "missed")
-                    analysis = analyze_missed_dose(st.session_state.patient, mname, missed_n, "not specified")
-                    st.session_state.chat_history.append({
-                        "role": "assistant",
-                        "content": f"⚠️ Missed dose recorded for **{mname}**.\n\n{analysis}"
-                    })
-                    if missed_n >= 2:
-                        alert = f"🔔 Caregiver Alert: {st.session_state.patient} has missed **{mname}** {missed_n} times. Please check on them."
-                        st.session_state.caregiver_alerts.append(alert)
-                        st.session_state.chat_history.append({"role": "assistant", "content": alert})
-                    st.rerun()
+        if medicines:
+            st.markdown("#### 🔔 Today's Schedule")
+            for med in medicines:
+                mname = med["name"]
+                mkey  = mname.lower()
+                icon  = "✅" if mkey in taken_today else "⏰"
+                ca, cb, cc = st.columns([3, 1, 1])
+                ca.markdown(f"{icon} **{mname}** — {med['dosage']} · {med['time']} · _{med['food']}_")
+                if mkey not in taken_today:
+                    if cb.button("✅ Taken", key=f"t_{mkey}"):
+                        users.log_dose(uname, mname, "taken")
+                        st.session_state.chat_history.append({"role":"assistant",
+                            "content": f"✅ Great job, {user['name']}! Recorded **{mname}** as taken. 💪"})
+                        speak(f"Great job {user['name']}! You have taken {mname}. Well done!")
+                        st.rerun()
+                    if cc.button("❌ Missed", key=f"m_{mkey}"):
+                        missed_n = users.check_missed_count(uname, mname) + 1
+                        users.log_dose(uname, mname, "missed")
+                        analysis = analyze_missed_dose(user["name"], mname, missed_n, "not specified")
+                        st.session_state.chat_history.append({"role":"assistant",
+                            "content": f"⚠️ Missed **{mname}**.\n\n{analysis}"})
+                        if missed_n >= 2:
+                            alert = f"🔔 {user['name']} missed **{mname}** {missed_n} times!"
+                            st.session_state.caregiver_alerts.append(alert)
+                        st.rerun()
+        else:
+            st.info("No medicines added yet. Go to **💊 My Medicines** to add.")
 
         st.divider()
 
-        # ── Chat interface ─────────────────────────────────────────────────
+        # AI Chat
         st.markdown("#### 💬 Chat with AI")
-
-        # Seed welcome message
         if not st.session_state.chat_history:
-            adh = get_adherence(st.session_state.patient)
-            welcome = (
-                f"Hello {st.session_state.patient}! 👋 I'm your Medicine AI Assistant.\n\n"
-                f"You have **{len(st.session_state.medicines)} medicines** scheduled today. "
-                f"Your overall adherence is **{adh['percentage']}%**.\n\n"
-                "You can ask me:\n"
+            adh = users.get_adherence(uname)
+            st.session_state.chat_history.append({"role":"assistant", "content":(
+                f"Hello {user['name']}! 👋 I'm your Medicine AI Assistant.\n\n"
+                f"You have **{len(medicines)} medicines** scheduled. "
+                f"Adherence: **{adh['percentage']}%**\n\n"
+                "Ask me anything:\n"
                 "- _\"What happens if I miss my BP tablet?\"_\n"
                 "- _\"Can I take Metformin and Aspirin together?\"_\n"
                 "- _\"I forgot whether I took my medicine\"_\n"
-                "- _\"I'm feeling dizzy after missing insulin\"_"
-            )
-            st.session_state.chat_history.append({"role": "assistant", "content": welcome})
+                "- _\"I'm feeling dizzy\"_"
+            )})
 
         for msg in st.session_state.chat_history:
-            with st.chat_message(msg["role"], avatar="💊" if msg["role"] == "assistant" else "👤"):
+            with st.chat_message(msg["role"], avatar="💊" if msg["role"]=="assistant" else "👤"):
                 st.markdown(msg["content"])
 
-        user_input = st.chat_input("Ask about your medicines, missed doses, interactions...")
+        user_input = st.chat_input("Ask about your medicines...")
         if user_input:
-            st.session_state.chat_history.append({"role": "user", "content": user_input})
-
-            # ── Emergency detection ────────────────────────────────────────
-            emergency_keywords = ["dizzy", "dizziness", "chest pain", "unconscious", "faint",
-                                   "can't breathe", "severe", "emergency", "help", "shaking", "confusion"]
-            is_emergency = any(kw in user_input.lower() for kw in emergency_keywords)
-
-            # ── Forgot medicine check ──────────────────────────────────────
-            forgot_check = any(w in user_input.lower() for w in ["forgot whether", "don't remember", "not sure if i took"])
-            if forgot_check:
-                today_taken = [l["medicine"] for l in get_todays_log(st.session_state.patient) if l["status"] == "taken"]
-                if today_taken:
-                    context = f"[System: Patient has taken today: {', '.join(today_taken)}]"
-                else:
-                    context = "[System: Patient has NOT marked any medicine as taken today.]"
-                full_msg = f"{context}\n\nPatient says: {user_input}"
+            st.session_state.chat_history.append({"role":"user","content":user_input})
+            emergency_kw = ["dizzy","chest pain","unconscious","faint","can't breathe","severe","shaking","bleeding","fell","fall"]
+            is_emergency = any(k in user_input.lower() for k in emergency_kw)
+            forgot_kw    = ["forgot whether","don't remember","not sure if i took","did i take"]
+            if any(w in user_input.lower() for w in forgot_kw):
+                taken_list = [l["medicine"] for l in users.get_todays_log(uname) if l["status"]=="taken"]
+                ctx = f"[Today taken: {', '.join(taken_list) if taken_list else 'NONE'}]"
+                full_msg = f"{ctx}\nPatient: {user_input}"
             else:
                 full_msg = user_input
-
-            history_for_ai = st.session_state.chat_history[:-1]  # exclude current user msg
-            reply = chat(history_for_ai, full_msg)
-
+            reply = chat(st.session_state.chat_history[:-1], full_msg)
             if is_emergency:
-                reply = f"🚨 **EMERGENCY DETECTED**\n\n{reply}\n\n---\n⚡ **Please contact your caregiver or call emergency services immediately if symptoms are severe.**"
-
-            st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                reply = f"🚨 **EMERGENCY DETECTED**\n\n{reply}\n\n---\n⚡ **Call emergency services immediately!**"
+                speak("Emergency detected! Please call emergency services immediately!")
+            st.session_state.chat_history.append({"role":"assistant","content":reply})
             st.rerun()
 
     with col_right:
-        # ── Voice Reminder ─────────────────────────────────────────────────
+        # Voice reminder
         st.markdown("#### 🗣️ Voice Reminder")
-        next_med = next(
-            (m for m in st.session_state.medicines if m["name"].lower() not in taken_today),
-            st.session_state.medicines[0]
-        )
-        voice_text = get_voice_reminder_text(
-            st.session_state.patient, next_med["name"],
-            next_med["dosage"], next_med["time"], next_med["food"]
-        )
-        st.markdown(f'<div class="voice-box">🔊 {voice_text}</div>', unsafe_allow_html=True)
+        if medicines:
+            next_med  = next((m for m in medicines if m["name"].lower() not in taken_today), medicines[0])
+            voice_txt = get_voice_reminder_text(user["name"], next_med["name"], next_med["dosage"], next_med["time"], next_med["food"])
+            st.markdown(f'<div class="voice-box">🔊 {voice_txt}</div>', unsafe_allow_html=True)
+            if st.button("🔊 Speak Now", use_container_width=True):
+                speak(voice_txt)
+        else:
+            st.info("Add medicines to get voice reminders.")
 
         st.divider()
 
-        # ── Drug Interaction Quick Check ───────────────────────────────────
-        st.markdown("#### 🔄 Drug Interaction Check")
-        med_a = st.text_input("Medicine A", placeholder="e.g. Metformin")
-        med_b = st.text_input("Medicine B", placeholder="e.g. Aspirin")
-        if st.button("⚡ Check Interaction"):
-            if med_a and med_b:
-                with st.spinner("Checking..."):
-                    result = chat([], f"Can I take {med_a} and {med_b} together? Give a brief interaction warning.")
-                st.info(result)
-            else:
-                st.warning("Enter both medicine names.")
-
-        st.divider()
-
-        # ── Caregiver Alerts ───────────────────────────────────────────────
+        # Caregiver alerts
         if st.session_state.caregiver_alerts:
             st.markdown("#### 👨‍👩‍👧 Caregiver Alerts")
             for alert in st.session_state.caregiver_alerts[-3:]:
                 st.markdown(f'<div class="alert-box">{alert}</div>', unsafe_allow_html=True)
 
-        # ── Patient Settings ───────────────────────────────────────────────
-        st.divider()
-        st.markdown("#### ⚙️ Patient")
-        new_name = st.text_input("Patient Name", value=st.session_state.patient)
-        if new_name != st.session_state.patient:
-            st.session_state.patient = new_name
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: MY MEDICINES
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "💊 My Medicines":
+    st.subheader("💊 My Medicines")
+
+    # Show existing
+    if medicines:
+        st.markdown("#### Current Medicines")
+        for i, med in enumerate(medicines):
+            ca, cb, cc = st.columns([4, 1, 1])
+            ca.markdown(f"**{med['name']}** — {med['dosage']} · {med['time']} · _{med['food']}_")
+            if cb.button("✏️ Edit", key=f"ed_{i}"):
+                st.session_state.edit_med_idx = i
+                st.rerun()
+            if cc.button("🗑️ Delete", key=f"del_{i}"):
+                medicines.pop(i)
+                users.save_medicines(uname, medicines)
+                st.rerun()
+
+    st.divider()
+
+    # Edit existing medicine
+    if st.session_state.edit_med_idx is not None:
+        idx = st.session_state.edit_med_idx
+        med = medicines[idx]
+        st.markdown(f"#### ✏️ Edit — {med['name']}")
+        with st.form("edit_med_form"):
+            en = st.text_input("Medicine Name", value=med["name"])
+            ed = st.text_input("Dosage",        value=med["dosage"])
+            et = st.text_input("Time",          value=med["time"])
+            ef = st.selectbox("Food Instruction",
+                              ["after food","before food","with food","any time","after lunch","before sleep"],
+                              index=["after food","before food","with food","any time","after lunch","before sleep"].index(med["food"]) if med["food"] in ["after food","before food","with food","any time","after lunch","before sleep"] else 0)
+            c1, c2 = st.columns(2)
+            save = c1.form_submit_button("💾 Save", use_container_width=True)
+            cancel = c2.form_submit_button("❌ Cancel", use_container_width=True)
+        if save:
+            medicines[idx] = {"name": en.strip(), "dosage": ed.strip(), "time": et.strip(), "food": ef}
+            users.save_medicines(uname, medicines)
+            st.session_state.edit_med_idx = None
+            st.success("✅ Medicine updated!")
+            st.rerun()
+        if cancel:
+            st.session_state.edit_med_idx = None
+            st.rerun()
+
+    # Add new medicine
+    st.markdown("#### ➕ Add New Medicine")
+    with st.form("add_med_form"):
+        mn = st.text_input("Medicine Name",   placeholder="e.g. Metformin")
+        md = st.text_input("Dosage",          placeholder="e.g. 500mg, 1 tablet")
+        mt = st.text_input("Time",            placeholder="e.g. 8:00 AM")
+        mf = st.selectbox("Food Instruction", ["after food","before food","with food","any time","after lunch","before sleep"])
+        if st.form_submit_button("➕ Add Medicine", use_container_width=True):
+            if mn.strip():
+                medicines.append({"name": mn.strip().title(), "dosage": md.strip(), "time": mt.strip(), "food": mf})
+                users.save_medicines(uname, medicines)
+                st.success(f"✅ {mn.title()} added!")
+                st.rerun()
+            else:
+                st.warning("Enter medicine name.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: REMINDERS
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "⏰ Reminders":
+    st.subheader("⏰ Voice Reminders")
+
+    if "active_reminders" not in st.session_state:
+        st.session_state.active_reminders = []
+    if "edit_rem_idx" not in st.session_state:
+        st.session_state.edit_rem_idx = None
+
+    if not medicines:
+        st.info("Add medicines first in My Medicines tab.")
+    else:
+        # Show active reminders
+        if st.session_state.active_reminders:
+            st.markdown("#### Active Reminders")
+            for i, rem in enumerate(st.session_state.active_reminders):
+                ca, cb, cc = st.columns([4, 1, 1])
+                ca.markdown(f"**{rem['medicine']}** - {rem['time']} - {rem['freq']} - {rem['rtype']}")
+                if cb.button("Edit", key=f"redit_{i}"):
+                    st.session_state.edit_rem_idx = i
+                    st.rerun()
+                if cc.button("Delete", key=f"rdel_{i}"):
+                    st.session_state.active_reminders.pop(i)
+                    st.rerun()
+            st.divider()
+
+        edit_idx = st.session_state.edit_rem_idx
+        edit_rem = st.session_state.active_reminders[edit_idx] if edit_idx is not None else None
+        st.markdown("#### " + ("Edit Reminder" if edit_rem else "New Reminder"))
+
+        med_names   = [m["name"] for m in medicines]
+        freq_opts   = ["Once", "Twice", "Three times"]
+        type_opts   = ["Daily", "Specific Date"]
+
+        def_med  = edit_rem["medicine"] if edit_rem and edit_rem["medicine"] in med_names else med_names[0]
+        def_freq = edit_rem["freq"]     if edit_rem and edit_rem["freq"] in freq_opts    else "Once"
+        def_type = edit_rem["rtype"]    if edit_rem and edit_rem["rtype"] in type_opts   else "Daily"
+        def_time = datetime.now().replace(second=0, microsecond=0)
+        if edit_rem:
+            try:
+                hh, mm = map(int, edit_rem["time"].split(":"))
+                def_time = def_time.replace(hour=hh, minute=mm)
+            except Exception:
+                pass
+
+        with st.form("reminder_form"):
+            r_med  = st.selectbox("Medicine",     med_names,  index=med_names.index(def_med))
+            r_time = st.time_input("Remind at",   value=def_time)
+            r_freq = st.selectbox("Times per day", freq_opts, index=freq_opts.index(def_freq))
+            r_type = st.radio("Type", type_opts,              index=type_opts.index(def_type), horizontal=True)
+            r_date = st.date_input("Date", value=datetime.now().date()) if r_type == "Specific Date" else None
+            c1, c2 = st.columns(2)
+            submit = c1.form_submit_button("Save Reminder",  use_container_width=True)
+            cancel = c2.form_submit_button("Cancel",         use_container_width=True)
+
+        if cancel:
+            st.session_state.edit_rem_idx = None
+            st.rerun()
+
+        if submit:
+            med_info  = next((m for m in medicines if m["name"] == r_med), {})
+            food_inst = med_info.get("food", "as prescribed")
+            dosage    = med_info.get("dosage", "")
+            speak_txt = f"Hello {user['name']}! Time to take {r_med} {dosage} {food_inst}. Please take your medicine now!"
+            speak_txt = speak_txt.encode("ascii", "ignore").decode("ascii")
+            hhmm      = r_time.strftime("%H:%M")
+            date_str  = r_date.strftime("%Y-%m-%d") if r_date else ""
+
+            rem_entry = {"medicine": r_med, "time": hhmm, "freq": r_freq, "rtype": r_type, "date": date_str}
+            if edit_idx is not None:
+                st.session_state.active_reminders[edit_idx] = rem_entry
+                st.session_state.edit_rem_idx = None
+            else:
+                st.session_state.active_reminders.append(rem_entry)
+
+            offsets = {"Once": [0], "Twice": [0, 480], "Three times": [0, 300, 600]}[r_freq]
+            for off in offsets:
+                h = (r_time.hour * 60 + r_time.minute + off) // 60 % 24
+                m = (r_time.minute + off) % 60
+                set_voice_timer(f"{h:02d}:{m:02d}", speak_txt, r_type, date_str)
+
+            st.success(f"Reminder saved for {r_med} at {hhmm} - {r_freq} - {r_type}")
             st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — Adherence Dashboard
+# PAGE: DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
-with tab2:
-    st.subheader(f"📊 Medicine Adherence Dashboard — {st.session_state.patient}")
-
-    adh = get_adherence(st.session_state.patient)
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f'<div class="metric-card"><h2>{adh["total"]}</h2><p>Total Doses</p></div>', unsafe_allow_html=True)
+elif page == "📊 Dashboard":
+    st.subheader(f"📊 Adherence Dashboard — {user['name']}")
+    adh = users.get_adherence(uname)
+    c1,c2,c3,c4 = st.columns(4)
+    c1.markdown(f'<div class="metric-card"><h2>{adh["total"]}</h2><p>Total</p></div>', unsafe_allow_html=True)
     c2.markdown(f'<div class="metric-card"><h2 style="color:#38a169">✅ {adh["taken"]}</h2><p>Taken</p></div>', unsafe_allow_html=True)
     c3.markdown(f'<div class="metric-card"><h2 style="color:#e53e3e">❌ {adh["missed"]}</h2><p>Missed</p></div>', unsafe_allow_html=True)
     c4.markdown(f'<div class="metric-card"><h2 style="color:#2d6a9f">📈 {adh["percentage"]}%</h2><p>Adherence</p></div>', unsafe_allow_html=True)
 
-    st.divider()
-
-    # ── Adherence bar ──────────────────────────────────────────────────────
     pct = adh["percentage"]
-    bar_color = "#38a169" if pct >= 80 else "#ffc107" if pct >= 50 else "#e53e3e"
+    bar = "#38a169" if pct>=80 else "#ffc107" if pct>=50 else "#e53e3e"
     st.markdown(f"""
-    <div style="background:#e2e8f0;border-radius:8px;height:24px;margin:0.5rem 0">
-        <div style="background:{bar_color};width:{pct}%;height:100%;border-radius:8px;
-                    display:flex;align-items:center;justify-content:center;color:white;font-weight:bold">
+    <div style="background:#e2e8f0;border-radius:8px;height:28px;margin:1rem 0">
+        <div style="background:{bar};width:{max(pct,3)}%;height:100%;border-radius:8px;
+                    display:flex;align-items:center;justify-content:center;color:white;font-weight:600">
             {pct}%
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+    </div>""", unsafe_allow_html=True)
 
-    if pct >= 80:
-        st.success("🌟 Excellent adherence! Keep it up!")
-    elif pct >= 50:
-        st.warning("⚠️ Moderate adherence. Try to be more consistent.")
-    elif adh["total"] == 0:
-        st.info("No doses logged yet. Use the reminders in the Chat tab.")
-    else:
-        st.error("🚨 Low adherence. Caregiver has been notified.")
+    if pct>=80:        st.success("🌟 Excellent adherence!")
+    elif pct>=50:      st.warning("⚠️ Moderate. Try to be consistent.")
+    elif adh["total"]==0: st.info("No doses logged yet.")
+    else:              st.error("🚨 Low adherence!")
 
-    # ── Dose log table ─────────────────────────────────────────────────────
     if adh["logs"]:
-        st.markdown("#### 📋 Dose History")
         import pandas as pd
-        df = pd.DataFrame(adh["logs"])[["time", "medicine", "status", "note"]]
-        df.columns = ["Time", "Medicine", "Status", "Note"]
-        df["Status"] = df["Status"].map({"taken": "✅ Taken", "missed": "❌ Missed", "skipped": "⏭️ Skipped"}).fillna(df["Status"])
+        df = pd.DataFrame(adh["logs"])[["time","medicine","status"]]
+        df.columns = ["Time","Medicine","Status"]
+        df["Status"] = df["Status"].map({"taken":"✅ Taken","missed":"❌ Missed"}).fillna(df["Status"])
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-    # ── Add demo data ──────────────────────────────────────────────────────
-    st.divider()
-    if st.button("🎲 Load Demo Data (for judges)"):
-        from demo_data import load_demo
-        load_demo(st.session_state.patient)
-        st.success("Demo data loaded! Refresh the dashboard.")
-        st.rerun()
-
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — Medicine Photo Verification
+# PAGE: VERIFY MEDICINE
 # ══════════════════════════════════════════════════════════════════════════════
-with tab3:
+elif page == "📸 Verify":
     st.subheader("📸 AI Medicine Verification")
-    st.markdown("Upload a photo of your medicine. AI will identify it and check if it matches today's schedule.")
-
-    scheduled_names = [m["name"] for m in st.session_state.medicines]
-    selected_med = st.selectbox("Which medicine should this be?", scheduled_names)
-
-    uploaded = st.file_uploader("📷 Upload medicine photo", type=["jpg", "jpeg", "png", "webp"])
-
+    opts     = ["Any / Just Identify"] + [m["name"] for m in medicines]
+    sel_med  = st.selectbox("Expected medicine", opts)
+    uploaded = st.file_uploader("📷 Upload photo", type=["jpg","jpeg","png","webp"])
     if uploaded:
-        st.image(uploaded, caption="Uploaded Medicine", width=300)
+        img_bytes = uploaded.read()
+        st.image(img_bytes, width=300)
         if st.button("🔍 Verify with AI"):
-            with st.spinner("AI is analysing the medicine..."):
-                result = verify_medicine_image(uploaded.read(), selected_med)
-            st.markdown("#### 🤖 AI Verification Result")
+            check = "any medicine, just identify it" if sel_med=="Any / Just Identify" else sel_med
+            with st.spinner("AI reading label..."):
+                result = verify_medicine_image(img_bytes, check)
+            st.markdown("#### 🤖 Result")
             st.markdown(result)
-
             if "✅" in result:
-                st.success("Medicine verified! You can proceed to take it.")
+                st.success("✅ Verified!")
+                speak(f"Medicine verified. This is {sel_med}.")
             elif "❌" in result:
-                st.error("⚠️ This does NOT appear to match your scheduled medicine. Please double-check.")
+                st.error("❌ Does not match!")
+                speak("Warning! Medicine does not match. Please check again.")
             else:
-                st.warning("AI could not confirm with certainty. Please verify manually.")
+                st.warning("⚠️ Uncertain. Verify manually.")
     else:
-        st.info("📌 Upload a clear photo of the medicine label or tablet strip for best results.")
+        st.info("📌 Upload a clear photo of the medicine label.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: PROFILE
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "👤 Profile":
+    st.subheader("👤 My Profile")
+    with st.form("profile_form"):
+        pn  = st.text_input("Full Name",    value=user["name"])
+        pa  = st.number_input("Age", 1, 120, int(user["age"]))
+        pph = st.text_input("Phone Number", value=user.get("phone",""))
+        st.text_input("Username", value=uname, disabled=True)
+        if st.form_submit_button("💾 Save Profile", use_container_width=True):
+            users.update_profile(uname, pn.strip(), int(pa), pph.strip())
+            st.success("✅ Profile updated!")
+            st.rerun()
