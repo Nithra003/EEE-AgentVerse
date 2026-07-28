@@ -4,9 +4,9 @@ INTRO_TEXT = (
 )
 
 GREETING_MESSAGES = [
-    "Hello {name}! I am so glad you are here with me today. 😊",
-    "Hi {name}! You are not alone, and I am here to keep you company. ❤️",
-    "Hello {name}! I am your friendly companion, and I am ready to listen. 🤖",
+    "Hello {name}! I am so glad you are here with me today.",
+    "Hi {name}! You are not alone, and I am here to keep you company.",
+    "Hello {name}! I am your friendly companion, and I am ready to listen.",
 ]
 
 MOOD_SUPPORT_MESSAGES = {

@@ -1,160 +1,191 @@
-"""
-app.py - Diet Recommendation Agent
-ElderCare AI – Day 1 Single Agent Challenge
-"""
+"""Diet Recommendation Agent - AI Assistant Style"""
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 import pandas as pd
 from diet_data import CONDITIONS, calculate_bmi, get_diet_plan
-from utils import validate_fields, generate_report_text
+from utils import generate_report_text
+from gemini_helper import ask_gemini
 
-st.set_page_config(
-    page_title="ElderCare AI – Diet Recommendation Agent",
-    page_icon="🥗",
-    layout="wide",
-)
+st.set_page_config(page_title="Diet Recommendation Agent", layout="centered")
 
 st.markdown("""
 <style>
-    .main-title { font-size:2.2rem; font-weight:800; color:#1E8449; text-align:center; padding:10px 0; }
-    .sub-title  { font-size:1rem; color:#555; text-align:center; margin-bottom:20px; }
-    .diet-card  { background:linear-gradient(135deg,#eafaf1,#d5f5e3); border-left:6px solid #1E8449;
-                  border-radius:12px; padding:20px 24px; margin:12px 0; }
-    .diet-card h3 { color:#1E8449; }
-    .warn-card  { background:linear-gradient(135deg,#fff9e6,#fef3cd); border-left:6px solid #F39C12;
-                  border-radius:12px; padding:20px 24px; margin:12px 0; }
-    .section-header { font-size:1.3rem; font-weight:700; color:#1A5276;
-                      border-bottom:2px solid #AED6F1; padding-bottom:6px; margin:20px 0 10px 0; }
-    div.stButton > button { font-size:1.05rem; padding:10px 24px; border-radius:8px; font-weight:600; }
+    .chat-header {
+        background: #1e5631;
+        color: white;
+        padding: 1.2rem 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    .chat-header h2 { margin: 0; font-size: 1.4rem; }
+    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
+    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Session State ──────────────────────────────────────────
+st.markdown("""
+<div class="chat-header">
+    <h2>Diet Recommendation Agent</h2>
+    <p>ElderCare AI - I will create a personalized diet plan based on your health condition.</p>
+</div>
+""", unsafe_allow_html=True)
+
 if "diet_history" not in st.session_state:
     st.session_state.diet_history = []
 
-# ── Sidebar ────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### 🥗 ElderCare AI")
-    st.markdown("**Diet Recommendation Agent**")
-    st.markdown("---")
-    st.metric("Plans Generated", len(st.session_state.diet_history))
-    st.markdown("---")
-    st.markdown("#### 🔗 ElderCare AI Agents")
-    for a in ["💊 Medicine Reminder","🚨 Emergency Detection","📅 Appointment Booking",
-              "📋 Prescription Explainer","📊 Health Report","👨‍👩‍👧 Family Notifier",
-              "🏃 Exercise Coach","😊 Mood Companion","🎙️ Voice Assistant"]:
-        st.markdown(f"<small>{a} *(coming soon)*</small>", unsafe_allow_html=True)
-    st.caption("ElderCare AI · AgentVerse Hackathon")
+STEPS = [
+    ("name",      "What is the patient's name?"),
+    ("age",       "What is the patient's age?"),
+    ("gender",    "What is the patient's gender? Please type: Male, Female, or Other."),
+    ("weight",    "What is the patient's weight in kg? For example: 70"),
+    ("height",    "What is the patient's height in cm? For example: 165"),
+    ("condition", f"What is the patient's health condition? Please type one of:\n\n" + "\n".join(f"- {c}" for c in CONDITIONS)),
+]
 
-# ── Header ─────────────────────────────────────────────────
-st.markdown('<div class="main-title">🥗 ElderCare AI – Diet Recommendation Agent</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Personalized diet plans for elderly based on health conditions & BMI</div>', unsafe_allow_html=True)
+if "step_index" not in st.session_state:
+    st.session_state.step_index = 0
+    st.session_state.data = {}
+    st.session_state.messages = []
+    st.session_state.done = False
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": "Hello! I am your Diet Recommendation Assistant.\n\nI will create a personalized diet plan for your patient. Let me ask a few questions.\n\n" + STEPS[0][1]
+    })
 
-c1, c2, c3 = st.columns(3)
-c1.metric("🥗 Diet Plans", "5 Conditions")
-c2.metric("🍽️ Meal Slots", "5 Per Day")
-c3.metric("👴 Elder-Friendly", "✅ Yes")
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-st.markdown("---")
+if not st.session_state.done:
+    user_input = st.chat_input("Type your answer here...")
 
-# ── Form ───────────────────────────────────────────────────
-st.markdown('<div class="section-header">📋 Patient Information</div>', unsafe_allow_html=True)
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        idx = st.session_state.step_index
+        key, _ = STEPS[idx]
 
-with st.form("diet_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-        name   = st.text_input("👤 Patient Name", placeholder="e.g. Rajamani")
-        age    = st.number_input("🎂 Age", min_value=1, max_value=120, value=65)
-        weight = st.number_input("⚖️ Weight (kg)", min_value=20.0, max_value=300.0, value=70.0, step=0.5)
-    with col2:
-        gender    = st.selectbox("⚧ Gender", ["", "Male", "Female", "Other"])
-        height    = st.number_input("📏 Height (cm)", min_value=50.0, max_value=250.0, value=165.0, step=0.5)
-        condition = st.selectbox("🏥 Health Condition", [""] + CONDITIONS)
+        # Validations
+        if key == "age":
+            try:
+                v = int(user_input.strip())
+                if not (1 <= v <= 120):
+                    raise ValueError
+            except ValueError:
+                st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid age between 1 and 120."})
+                st.rerun()
 
-    submitted = st.form_submit_button("🥗 Generate Diet Plan", use_container_width=True)
+        if key == "gender":
+            if user_input.strip().lower() not in ["male", "female", "other"]:
+                st.session_state.messages.append({"role": "assistant", "content": "Please type Male, Female, or Other."})
+                st.rerun()
+            user_input = user_input.strip().title()
 
-# ── On Submit ──────────────────────────────────────────────
-if submitted:
-    errors = validate_fields(name, age, weight, height, condition, gender)
-    if errors:
-        for e in errors:
-            st.error(f"❌ {e}")
-    else:
-        bmi, bmi_cat = calculate_bmi(weight, height)
-        plan = get_diet_plan(condition)
+        if key == "weight":
+            try:
+                v = float(user_input.strip())
+                if not (20 <= v <= 300):
+                    raise ValueError
+            except ValueError:
+                st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid weight between 20 and 300 kg."})
+                st.rerun()
 
-        st.success("✅ Diet plan generated successfully!")
+        if key == "height":
+            try:
+                v = float(user_input.strip())
+                if not (50 <= v <= 250):
+                    raise ValueError
+            except ValueError:
+                st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid height between 50 and 250 cm."})
+                st.rerun()
 
-        # BMI Card
-        st.markdown('<div class="section-header">📊 BMI Analysis</div>', unsafe_allow_html=True)
-        b1, b2, b3 = st.columns(3)
-        b1.metric("BMI Score", bmi)
-        b2.metric("Category", bmi_cat)
-        b3.metric("Condition", condition)
+        if key == "condition":
+            matched = next((c for c in CONDITIONS if c.lower() == user_input.strip().lower()), None)
+            if not matched:
+                st.session_state.messages.append({"role": "assistant", "content": "Please type one of the listed conditions:\n\n" + "\n".join(f"- {c}" for c in CONDITIONS)})
+                st.rerun()
+            user_input = matched
 
-        bmi_color = {"Normal": "🟢", "Underweight": "🟡", "Overweight": "🟠", "Obese": "🔴"}.get(bmi_cat, "⚪")
-        if bmi_cat == "Normal":
-            st.success(f"{bmi_color} BMI is Normal – Great! Keep maintaining a healthy lifestyle.")
-        elif bmi_cat == "Underweight":
-            st.warning(f"{bmi_color} BMI is low – Focus on nutrient-rich foods to gain healthy weight.")
+        st.session_state.data[key] = user_input.strip()
+        st.session_state.step_index += 1
+
+        if st.session_state.step_index < len(STEPS):
+            st.session_state.messages.append({"role": "assistant", "content": STEPS[st.session_state.step_index][1]})
         else:
-            st.warning(f"{bmi_color} BMI is {bmi_cat} – Follow the diet plan carefully.")
+            d = st.session_state.data
+            bmi, bmi_cat = calculate_bmi(float(d["weight"]), float(d["height"]))
+            plan = get_diet_plan(d["condition"])
 
-        # Diet Plan Card
-        st.markdown('<div class="section-header">🍽️ Personalized Diet Plan</div>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="diet-card">
-            <h3>🥗 Diet Plan for {condition}</h3>
-            <p>{plan['description']}</p>
-            <p>💧 <b>Water Intake:</b> {plan['water_intake']}</p>
-            <p>💡 <b>Tip:</b> {plan['tip']}</p>
-        </div>
-        """, unsafe_allow_html=True)
+            meal_lines = "\n".join(f"  {k:15}: {v}" for k, v in plan["meal_plan"].items())
+            eat_lines  = "\n".join(f"  - {f}" for f in plan["foods_to_eat"])
+            avoid_lines = "\n".join(f"  - {f}" for f in plan["foods_to_avoid"])
 
-        # Meal Plan Table
-        st.markdown('<div class="section-header">🕐 Daily Meal Schedule</div>', unsafe_allow_html=True)
-        meal_df = pd.DataFrame(
-            [{"Meal Time": k, "Recommended Food": v} for k, v in plan["meal_plan"].items()]
-        )
-        st.dataframe(meal_df, use_container_width=True, hide_index=True)
+            ai_advice = ask_gemini(
+                f"You are an eldercare nutritionist. Give personalized diet advice for a {d['age']}-year-old "
+                f"{d['gender']} named {d['name']} with {d['condition']}. BMI: {bmi} ({bmi_cat}), "
+                f"Weight: {d['weight']}kg, Height: {d['height']}cm. "
+                f"Give 3 specific food tips, 1 meal timing tip, and 1 motivational line. Keep it under 120 words. Be warm."
+            )
 
-        # Foods
-        col_eat, col_avoid = st.columns(2)
-        with col_eat:
-            st.markdown("#### ✅ Foods to Eat")
-            for f in plan["foods_to_eat"]:
-                st.success(f"✓ {f}")
-        with col_avoid:
-            st.markdown("#### ❌ Foods to Avoid")
-            for f in plan["foods_to_avoid"]:
-                st.error(f"✗ {f}")
+            reply = (
+                f"Diet plan generated for {d['name']}.\n\n"
+                f"BMI Analysis\n"
+                f"------------\n"
+                f"BMI Score  : {bmi}\n"
+                f"Category   : {bmi_cat}\n"
+                f"Condition  : {d['condition']}\n\n"
+                f"Diet Plan\n"
+                f"---------\n"
+                f"{plan['description']}\n"
+                f"Water Intake : {plan['water_intake']}\n"
+                f"Tip          : {plan['tip']}\n\n"
+                f"Daily Meal Schedule\n"
+                f"-------------------\n"
+                f"{meal_lines}\n\n"
+                f"Foods to Eat\n"
+                f"------------\n"
+                f"{eat_lines}\n\n"
+                f"Foods to Avoid\n"
+                f"--------------\n"
+                f"{avoid_lines}\n\n"
+                f"AI Personalized Advice\n"
+                f"----------------------\n"
+                f"{ai_advice}\n\n"
+                "Type NEW to generate another diet plan."
+            )
 
-        # History
-        st.session_state.diet_history.append({
-            "Patient": name, "Age": age, "Condition": condition,
-            "BMI": bmi, "Category": bmi_cat,
-        })
+            st.session_state.diet_history.append({
+                "Patient": d["name"], "Age": d["age"],
+                "Condition": d["condition"], "BMI": bmi, "Category": bmi_cat,
+            })
 
-        # Download
-        report_data = dict(name=name, age=age, gender=gender, weight=weight,
-                           height=height, bmi=bmi, bmi_category=bmi_cat,
-                           condition=condition, plan=plan)
-        st.download_button(
-            "📥 Download Diet Report",
-            data=generate_report_text(report_data),
-            file_name=f"diet_report_{name.replace(' ','_')}.txt",
-            mime="text/plain",
-            use_container_width=True,
-        )
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            st.session_state.done = True
+            st.session_state._report_data = dict(
+                name=d["name"], age=d["age"], gender=d["gender"],
+                weight=float(d["weight"]), height=float(d["height"]),
+                bmi=bmi, bmi_category=bmi_cat, condition=d["condition"], plan=plan
+            )
 
-# ── History ────────────────────────────────────────────────
-st.markdown("---")
-st.markdown('<div class="section-header">📜 Diet Plan History</div>', unsafe_allow_html=True)
-if st.session_state.diet_history:
-    st.dataframe(pd.DataFrame(st.session_state.diet_history), use_container_width=True, hide_index=True)
+        st.rerun()
 else:
-    st.info("📭 No diet plans generated yet.")
+    user_input = st.chat_input("Type NEW to start over...")
+    if user_input and user_input.strip().upper() == "NEW":
+        for key in ["step_index", "data", "messages", "done", "_report_data"]:
+            st.session_state.pop(key, None)
+        st.rerun()
 
-st.markdown("---")
-st.markdown("<center><small>🥗 ElderCare AI · Diet Recommendation Agent · AgentVerse Hackathon</small></center>", unsafe_allow_html=True)
+    if "_report_data" in st.session_state:
+        rd = st.session_state._report_data
+        st.download_button(
+            "Download Diet Report",
+            data=generate_report_text(rd),
+            file_name=f"diet_report_{rd['name'].replace(' ','_')}.txt",
+            mime="text/plain",
+        )
+
+if st.session_state.diet_history:
+    st.markdown("---")
+    st.markdown("**Diet Plan History**")
+    st.dataframe(pd.DataFrame(st.session_state.diet_history), use_container_width=True, hide_index=True)

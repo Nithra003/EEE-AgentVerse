@@ -1,201 +1,142 @@
-import textwrap
-from pathlib import Path
+"""Prescription Explainer Agent - AI Assistant Style"""
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
-
 from medicine_data import MedicineKnowledgeBase
-from utils import build_summary_text, validate_form
+from utils import build_summary_text
+from gemini_helper import ask_gemini
 
+st.set_page_config(page_title="Prescription Explainer Agent", layout="centered")
 
-class PrescriptionExplainerApp:
-    """Main Streamlit application for explaining prescriptions in simple language."""
+st.markdown("""
+<style>
+    .chat-header {
+        background: #0f766e;
+        color: white;
+        padding: 1.2rem 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    .chat-header h2 { margin: 0; font-size: 1.4rem; }
+    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
+    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
+</style>
+""", unsafe_allow_html=True)
 
-    def __init__(self) -> None:
-        self.knowledge_base = MedicineKnowledgeBase()
+st.markdown("""
+<div class="chat-header">
+    <h2>Prescription Explainer Agent</h2>
+    <p>ElderCare AI - I will explain your prescription in simple, easy-to-understand language.</p>
+</div>
+""", unsafe_allow_html=True)
 
-    def run(self) -> None:
-        self._set_page_style()
-        self._render_home_page()
-        self._render_form()
+STEPS = [
+    ("patient_name",      "What is the patient's name?"),
+    ("age",               "How old is the patient?"),
+    ("medicine_name",     "What is the name of the medicine?"),
+    ("dosage",            "What is the dosage? For example: 500 mg, 1 tablet."),
+    ("frequency",         "How often should it be taken? For example: twice daily, once at night."),
+    ("food_relation",     "Should it be taken before food, after food, with food, or any time?"),
+    ("duration",          "For how many days should the patient take this medicine?"),
+    ("medical_condition", "What medical condition is this medicine prescribed for?"),
+]
 
-    def _set_page_style(self) -> None:
-        st.markdown(
-            """
-            <style>
-            .main {
-                background: linear-gradient(135deg, #f7fcff 0%, #eef9f2 100%);
-            }
-            .stApp {
-                color: #16324f;
-            }
-            .hero-card {
-                background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
-                padding: 1.4rem;
-                border-radius: 16px;
-                color: white;
-                box-shadow: 0 8px 20px rgba(15, 118, 110, 0.18);
-            }
-            .summary-card {
-                background: #f9fffc;
-                border: 1px solid #bde8dd;
-                border-radius: 14px;
-                padding: 1rem;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+if "step_index" not in st.session_state:
+    st.session_state.step_index = 0
+    st.session_state.data = {}
+    st.session_state.messages = []
+    st.session_state.done = False
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": "Hello! I am your Prescription Explainer Assistant.\n\nI will help explain this prescription in simple language. Let me ask you a few questions.\n\n" + STEPS[0][1]
+    })
 
-    def _render_home_page(self) -> None:
-        st.markdown(
-            """
-            <div class="hero-card">
-                <h1>💊 ElderCare AI – Prescription Explainer Agent</h1>
-                <p>This friendly app helps elderly patients understand medicines in simple, safe, and easy-to-read language.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-        st.write("")
-        st.subheader("🧡 Why this helps")
-        st.write(
-            "Older adults can often feel overwhelmed by prescription instructions. This tool explains the purpose, timing, precautions, and common side effects in plain language."
-        )
+if not st.session_state.done:
+    user_input = st.chat_input("Type your answer here...")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info("📋 Enter the medicine details below to receive an easy explanation.")
-        with col2:
-            st.warning("⚠️ This app provides general information only and does not replace medical advice.")
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        idx = st.session_state.step_index
+        key, _ = STEPS[idx]
+        st.session_state.data[key] = user_input.strip()
+        st.session_state.step_index += 1
 
-    def _render_form(self) -> None:
-        st.write("")
-        st.subheader("📝 Patient Prescription Form")
+        if st.session_state.step_index < len(STEPS):
+            next_question = STEPS[st.session_state.step_index][1]
+            st.session_state.messages.append({"role": "assistant", "content": next_question})
+        else:
+            d = st.session_state.data
+            kb = MedicineKnowledgeBase()
+            medicine = kb.get_medicine(d["medicine_name"]) or kb.get_generic_medicine(d["medicine_name"])
 
-        with st.form("prescription_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                patient_name = st.text_input("Patient Name", placeholder="Enter patient name")
-                age = st.text_input("Age", placeholder="e.g. 72")
-                medicine_name = st.text_input("Medicine Name", placeholder="e.g. Paracetamol")
-                dosage = st.text_input("Dosage", placeholder="e.g. 500 mg")
-            with col2:
-                frequency = st.text_input("Frequency", placeholder="e.g. Twice daily")
-                food_relation = st.selectbox("Before/After Food", ["Before food", "After food", "With food", "Any time"])
-                duration = st.text_input("Duration (Days)", placeholder="e.g. 5")
-                medical_condition = st.text_input("Medical Condition", placeholder="e.g. Fever")
-
-            submitted = st.form_submit_button("Explain Prescription")
-
-        if submitted:
-            errors = validate_form(
-                patient_name=patient_name,
-                age=age,
-                medicine_name=medicine_name,
-                dosage=dosage,
-                frequency=frequency,
-                food_relation=food_relation,
-                duration=duration,
-                medical_condition=medical_condition,
+            info = (
+                f"Prescription Details\n"
+                f"--------------------\n"
+                f"Patient          : {d['patient_name']}\n"
+                f"Age              : {d['age']}\n"
+                f"Medicine         : {medicine.name}\n"
+                f"Purpose          : {medicine.purpose}\n"
+                f"Treats           : {medicine.treats}\n"
+                f"How to take      : {medicine.how_to_take.format(dosage=d['dosage'], frequency=d['frequency'])}\n"
+                f"Best time        : {medicine.best_time}\n"
+                f"Food relation    : {d['food_relation']}\n"
+                f"Duration         : {d['duration']} days\n"
+                f"Missed dose      : {medicine.missed_dose}\n\n"
+                f"Precautions\n"
+                f"-----------\n" +
+                "\n".join(f"- {p}" for p in medicine.precautions) +
+                "\n\nSide Effects\n"
+                f"------------\n" +
+                "\n".join(f"- {s}" for s in medicine.side_effects)
             )
 
-            if errors:
-                for error in errors:
-                    st.error(error)
-                return
+            ai_prompt = (
+                f"You are a friendly eldercare assistant. Explain the medicine '{d['medicine_name']}' "
+                f"prescribed for '{d['medical_condition']}' to a {d['age']}-year-old patient named {d['patient_name']}. "
+                f"Dosage: {d['dosage']}, Frequency: {d['frequency']}, Duration: {d['duration']} days, {d['food_relation']}. "
+                f"Use very simple language. Include: what it does, how to take it, 2 precautions, 1 tip. "
+                f"Keep it under 150 words. Be warm and reassuring."
+            )
+            ai_response = ask_gemini(ai_prompt)
 
-            st.success("✅ Prescription details accepted. Preparing your easy-to-read explanation...")
-            self._render_explanation(
-                patient_name=patient_name,
-                age=age,
-                medicine_name=medicine_name,
-                dosage=dosage,
-                frequency=frequency,
-                food_relation=food_relation,
-                duration=duration,
-                medical_condition=medical_condition,
+            summary = build_summary_text(
+                patient_name=d["patient_name"],
+                medicine_name=medicine.name,
+                dosage=d["dosage"],
+                frequency=d["frequency"],
+                duration=d["duration"],
+                purpose=medicine.purpose,
             )
 
-    def _render_explanation(
-        self,
-        patient_name: str,
-        age: str,
-        medicine_name: str,
-        dosage: str,
-        frequency: str,
-        food_relation: str,
-        duration: str,
-        medical_condition: str,
-    ) -> None:
-        medicine = self.knowledge_base.get_medicine(medicine_name)
-        if medicine is None:
-            medicine = self.knowledge_base.get_generic_medicine(medicine_name)
+            reply = (
+                f"{info}\n\n"
+                f"AI Explanation\n"
+                f"--------------\n"
+                f"{ai_response}\n\n"
+                "Type NEW to explain another prescription."
+            )
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            st.session_state.done = True
+            st.session_state._summary = summary
+            st.session_state._patient = d["patient_name"]
 
-        st.write("")
-        st.subheader("📋 Medicine Information")
-        info_col1, info_col2 = st.columns(2)
+        st.rerun()
+else:
+    user_input = st.chat_input("Type NEW to start over...")
+    if user_input and user_input.strip().upper() == "NEW":
+        for key in ["step_index", "data", "messages", "done", "_summary", "_patient"]:
+            st.session_state.pop(key, None)
+        st.rerun()
 
-        with info_col1:
-            st.markdown(f"**Medicine:** {medicine.name}")
-            st.markdown(f"**Purpose:** {medicine.purpose}")
-            st.markdown(f"**What it treats:** {medicine.treats}")
-            st.markdown(f"**How to take it:** {medicine.how_to_take.format(dosage=dosage, frequency=frequency)}")
-
-        with info_col2:
-            st.markdown(f"**Best time to take it:** {medicine.best_time}")
-            st.markdown(f"**Before or after food:** {food_relation}")
-            st.markdown(f"**Duration:** {duration} days")
-            st.markdown(f"**Missed dose advice:** {medicine.missed_dose}")
-
-        st.write("")
-        with st.expander("⚠️ Precautions"):
-            for item in medicine.precautions:
-                st.write(f"- {item}")
-            st.write("- Store the medicine in a cool, dry place away from direct sunlight.")
-            st.write("- Keep medicines out of reach of children and pets.")
-            st.write("- If you feel confused or unwell, contact your doctor or pharmacist.")
-
-        st.write("")
-        with st.expander("🩺 Possible Side Effects"):
-            for item in medicine.side_effects:
-                st.write(f"- {item}")
-            st.warning("If side effects become severe, contact your doctor immediately.")
-
-        st.write("")
-        st.subheader("🧾 Prescription Summary")
-        summary_text = build_summary_text(
-            patient_name=patient_name,
-            medicine_name=medicine.name,
-            dosage=dosage,
-            frequency=frequency,
-            duration=duration,
-            purpose=medicine.purpose,
-        )
-
-        st.markdown(f"<div class='summary-card'>{summary_text.replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
-
-        st.write("")
+    if hasattr(st.session_state, "_summary") or "_summary" in st.session_state:
         st.download_button(
-            label="💾 Download Summary",
-            data=summary_text.encode("utf-8"),
-            file_name=f"{patient_name.replace(' ', '_').lower()}_summary.txt",
+            label="Download Prescription Summary",
+            data=st.session_state._summary.encode("utf-8"),
+            file_name=f"{st.session_state.get('_patient','patient').replace(' ','_').lower()}_summary.txt",
             mime="text/plain",
         )
-
-        st.info("This explanation is general guidance only. It does not replace professional medical advice.")
-
-        # Future integration point: Medicine Reminder Agent
-        # Future integration point: Appointment Booking Agent
-        # Future integration point: Emergency Detection Agent
-        # Future integration point: Health Monitoring Agent
-        # Future integration point: Family Notification Agent
-        # Future integration point: Voice Companion Agent
-        # Future integration point: Diet Planning Agent
-        # Future integration point: Exercise Coach Agent
-        # Future integration point: Hospital Navigation Agent
-
-
-if __name__ == "__main__":
-    app = PrescriptionExplainerApp()
-    app.run()

@@ -1,25 +1,18 @@
-"""Demo data for the medicine reminder agent."""
+"""Demo data loader for hackathon judges."""
+from medicine_db import log_dose
 
-SAMPLE_SCENARIOS = [
-    {
-        "patient_name": "Evelyn",
-        "medicine_name": "Vitamin D",
-        "dosage": "1 tablet",
-        "scheduled_time": "8:00 AM",
-        "patient_response": None,
-    },
-    {
-        "patient_name": "Evelyn",
-        "medicine_name": "Vitamin D",
-        "dosage": "1 tablet",
-        "scheduled_time": "8:00 AM",
-        "patient_response": "Yes, I took it.",
-    },
-    {
-        "patient_name": "Evelyn",
-        "medicine_name": "Vitamin D",
-        "dosage": "1 tablet",
-        "scheduled_time": "8:00 AM",
-        "patient_response": "I forgot and will take it later.",
-    },
-]
+def load_demo(patient: str = "Rajan"):
+    entries = [
+        (patient, "Metformin",  "taken",   ""),
+        (patient, "Amlodipine", "taken",   ""),
+        (patient, "Vitamin D",  "missed",  "Forgot after lunch"),
+        (patient, "Omeprazole", "taken",   ""),
+        (patient, "Metformin",  "taken",   ""),
+        (patient, "Amlodipine", "missed",  "Was travelling"),
+        (patient, "Vitamin D",  "taken",   ""),
+        (patient, "Omeprazole", "taken",   ""),
+        (patient, "Metformin",  "taken",   ""),
+        (patient, "Amlodipine", "taken",   ""),
+    ]
+    for p, m, s, n in entries:
+        log_dose(p, m, s, n)

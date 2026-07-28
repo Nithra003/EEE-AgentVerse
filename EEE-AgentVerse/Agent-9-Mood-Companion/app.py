@@ -1,163 +1,246 @@
-"""
-app.py - Mood Companion Agent
-ElderCare AI – Day 1 Single Agent Challenge
-"""
+"""Mood Companion Agent - AI Assistant Style"""
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import random
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from responses import MOODS, DAILY_AFFIRMATIONS, BREATHING_EXERCISE, get_mood_response
-from utils import validate_fields, generate_report_text
+from gemini_helper import ask_gemini
 
-st.set_page_config(
-    page_title="ElderCare AI – Mood Companion Agent",
-    page_icon="😊",
-    layout="wide",
-)
+st.set_page_config(page_title="Mood Companion Agent", layout="centered")
 
 st.markdown("""
 <style>
-    .main-title  { font-size:2.2rem; font-weight:800; color:#6C3483; text-align:center; padding:10px 0; }
-    .sub-title   { font-size:1rem; color:#555; text-align:center; margin-bottom:20px; }
-    .mood-card   { border-radius:14px; padding:22px 26px; margin:14px 0; }
-    .affirmation { background:linear-gradient(135deg,#f5eef8,#e8daef); border-left:6px solid #6C3483;
-                   border-radius:12px; padding:18px 22px; margin:12px 0; font-size:1.1rem; }
-    .breathing   { background:linear-gradient(135deg,#eafaf1,#d5f5e3); border-left:6px solid #1E8449;
-                   border-radius:12px; padding:18px 22px; margin:12px 0; }
-    .section-header { font-size:1.3rem; font-weight:700; color:#6C3483;
-                      border-bottom:2px solid #D7BDE2; padding-bottom:6px; margin:20px 0 10px 0; }
-    div.stButton > button { font-size:1.05rem; padding:10px 24px; border-radius:8px; font-weight:600; }
+    .chat-header {
+        background: #4a235a;
+        color: white;
+        padding: 1.2rem 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    .chat-header h2 { margin: 0; font-size: 1.4rem; }
+    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
+    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Session State ──────────────────────────────────────────
+st.markdown("""
+<div class="chat-header">
+    <h2>Mood Companion Agent</h2>
+    <p>ElderCare AI - I am here to support your emotional wellness and daily positivity.</p>
+</div>
+""", unsafe_allow_html=True)
+
+MOOD_DATA = {
+    "Happy": {
+        "message": "That is wonderful! Your positive energy is truly inspiring.",
+        "activities": [
+            "Listen to your favourite old songs",
+            "Call a friend or family member to share your joy",
+            "Take a short walk in the garden",
+            "Read an inspiring story or book",
+            "Write down 3 things you are grateful for today",
+        ],
+        "affirmation": "You are loved, valued, and bring joy to everyone around you.",
+        "tip": "Share your happiness - it multiplies when shared!",
+    },
+    "Sad": {
+        "message": "It is okay to feel sad sometimes. You are not alone.",
+        "activities": [
+            "Talk to a family member or trusted friend",
+            "Listen to soft, calming music",
+            "Sit near a window and enjoy natural light",
+            "Make yourself a warm cup of tea or milk",
+            "Read a comforting book or watch a light movie",
+        ],
+        "affirmation": "Every storm passes. Brighter days are ahead for you.",
+        "tip": "Do not hesitate to reach out to family - they care about you deeply.",
+    },
+    "Anxious": {
+        "message": "Take a deep breath. You are safe and everything will be okay.",
+        "activities": [
+            "Try 5 minutes of deep breathing (inhale 4s, hold 4s, exhale 4s)",
+            "Take a slow, gentle walk indoors",
+            "Practice prayer or meditation",
+            "Listen to calming nature sounds",
+            "Write down what is worrying you - it helps to express it",
+        ],
+        "affirmation": "You have overcome challenges before. You are stronger than you think.",
+        "tip": "Box breathing: Inhale 4 counts, Hold 4, Exhale 4, Hold 4. Repeat 4 times.",
+    },
+    "Tired": {
+        "message": "Rest is important. Your body is telling you to slow down.",
+        "activities": [
+            "Take a short 20-minute nap",
+            "Drink warm milk or herbal tea",
+            "Do gentle seated stretches",
+            "Sit quietly in fresh air for 10 minutes",
+            "Read something light and relaxing",
+        ],
+        "affirmation": "Rest is not laziness - it is wisdom. Take care of yourself.",
+        "tip": "A 20-minute power nap can restore energy without affecting night sleep.",
+    },
+    "Frustrated": {
+        "message": "It is okay to feel frustrated. Let us find a way to feel better.",
+        "activities": [
+            "Take a brisk walk to release tension",
+            "Listen to uplifting or energetic music",
+            "Write down your feelings in a journal",
+            "Try progressive muscle relaxation",
+            "Talk to someone you trust about how you feel",
+        ],
+        "affirmation": "Your feelings are valid. You have the strength to work through this.",
+        "tip": "Count slowly to 10 before reacting. It gives your mind time to calm down.",
+    },
+    "Lonely": {
+        "message": "You matter deeply to the people around you. Let us connect!",
+        "activities": [
+            "Call a family member or old friend right now",
+            "Join a community singing or prayer group",
+            "Visit a neighbour for a short chat",
+            "Watch a favourite show or movie",
+            "Write a letter or message to someone you miss",
+        ],
+        "affirmation": "You are never truly alone. People love and think about you.",
+        "tip": "Even a 5-minute phone call can brighten your day and someone else's too.",
+    },
+}
+
+MOODS = list(MOOD_DATA.keys())
+
+DAILY_AFFIRMATIONS = [
+    "Every day is a new opportunity to feel better.",
+    "You are stronger than you know.",
+    "Small steps forward are still progress.",
+    "You are loved and appreciated.",
+    "Your smile makes the world brighter.",
+    "Today is a good day to be alive.",
+    "You have wisdom that only comes with experience.",
+]
+
+BREATHING_STEPS = [
+    "Sit comfortably and close your eyes.",
+    "Inhale slowly through your nose for 4 counts.",
+    "Hold your breath for 4 counts.",
+    "Exhale slowly through your mouth for 4 counts.",
+    "Hold for 4 counts. Repeat 4 times.",
+]
+
 if "mood_history" not in st.session_state:
     st.session_state.mood_history = []
 if "daily_affirmation" not in st.session_state:
     st.session_state.daily_affirmation = random.choice(DAILY_AFFIRMATIONS)
 
-# ── Sidebar ────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### 😊 ElderCare AI")
-    st.markdown("**Mood Companion Agent**")
-    st.markdown("---")
-    st.metric("Check-ins Today", len(st.session_state.mood_history))
-    st.markdown("---")
-    st.markdown("#### 💬 Today's Affirmation")
-    st.info(f'"{st.session_state.daily_affirmation}"')
-    st.markdown("---")
-    st.markdown("#### 🧘 Quick Breathing")
-    st.markdown(f"**{BREATHING_EXERCISE['name']}**")
-    for i, step in enumerate(BREATHING_EXERCISE["steps"], 1):
-        st.markdown(f"<small>{i}. {step}</small>", unsafe_allow_html=True)
-    st.caption("ElderCare AI · AgentVerse Hackathon")
+STEPS = [
+    ("name", "What is your name?"),
+    ("age",  "How old are you?"),
+    ("mood", f"How are you feeling right now? Please type one of:\n\n" + "\n".join(f"- {m}" for m in MOODS)),
+    ("note", "Would you like to share anything about how your day is going? (Type SKIP to continue)"),
+]
 
-# ── Header ─────────────────────────────────────────────────
-st.markdown('<div class="main-title">😊 ElderCare AI – Mood Companion Agent</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Your caring companion for emotional wellness and daily positivity</div>', unsafe_allow_html=True)
-
-c1, c2, c3 = st.columns(3)
-c1.metric("😊 Mood Options", "6 Moods")
-c2.metric("🎯 Activities", "5 Per Mood")
-c3.metric("💬 Affirmations", "Daily")
-
-st.markdown("---")
-
-# ── Daily Affirmation Banner ───────────────────────────────
-st.markdown(f"""
-<div class="affirmation">
-    💬 <b>Today's Affirmation:</b><br>
-    <i>"{st.session_state.daily_affirmation}"</i>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Form ───────────────────────────────────────────────────
-st.markdown('<div class="section-header">🌟 How Are You Feeling Today?</div>', unsafe_allow_html=True)
-
-with st.form("mood_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-        name = st.text_input("👤 Your Name", placeholder="e.g. Kamala Paati")
-        age  = st.number_input("🎂 Age", min_value=1, max_value=120, value=68)
-    with col2:
-        mood = st.selectbox("💭 How are you feeling right now?", [""] + MOODS)
-        note = st.text_area("📝 Want to share anything? (optional)", placeholder="Write how your day is going...", height=80)
-
-    submitted = st.form_submit_button("💙 Get Support & Activities", use_container_width=True)
-
-# ── On Submit ──────────────────────────────────────────────
-if submitted:
-    errors = validate_fields(name, age, mood)
-    if errors:
-        for e in errors:
-            st.error(f"❌ {e}")
-    else:
-        response = get_mood_response(mood)
-        st.success(f"💙 Hello {name}! Here's your personalised support.")
-
-        # Mood Response Card
-        st.markdown('<div class="section-header">💬 Your Mood Response</div>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="mood-card" style="background:linear-gradient(135deg,#f8f9fa,#e9ecef);
-             border-left:6px solid {response['color']};">
-            <h3 style="color:{response['color']};">{mood}</h3>
-            <p style="font-size:1.1rem;">{response['message']}</p>
-            <p>💡 <b>Tip:</b> {response['tip']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Affirmation
-        st.markdown(f"""
-        <div class="affirmation">
-            💬 <b>A message for you, {name}:</b><br>
-            <i>"{response['affirmation']}"</i>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Activities
-        st.markdown('<div class="section-header">🎯 Suggested Activities</div>', unsafe_allow_html=True)
-        cols = st.columns(2)
-        for i, activity in enumerate(response["activities"]):
-            cols[i % 2].info(activity)
-
-        # Breathing Exercise
-        st.markdown('<div class="section-header">🧘 Breathing Exercise</div>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="breathing">
-            <b>🌬️ {BREATHING_EXERCISE['name']}</b><br>
-            <small>{BREATHING_EXERCISE['benefit']}</small>
-        </div>
-        """, unsafe_allow_html=True)
-        for i, step in enumerate(BREATHING_EXERCISE["steps"], 1):
-            st.markdown(f"**{i}.** {step}")
-
-        # Log to history
-        st.session_state.mood_history.append({
-            "Name": name,
-            "Age": age,
-            "Mood": mood,
-            "Note": note if note else "—",
-            "Time": datetime.now().strftime("%H:%M:%S"),
-        })
-
-        # Download
-        report_data = dict(name=name, age=age, mood=mood, response=response)
-        st.download_button(
-            "📥 Download Mood Report",
-            data=generate_report_text(report_data),
-            file_name=f"mood_report_{name.replace(' ','_')}.txt",
-            mime="text/plain",
-            use_container_width=True,
+if "step_index" not in st.session_state:
+    st.session_state.step_index = 0
+    st.session_state.data = {}
+    st.session_state.messages = []
+    st.session_state.done = False
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": (
+            f"Hello! I am your Mood Companion Assistant.\n\n"
+            f"Today's affirmation: \"{st.session_state.daily_affirmation}\"\n\n"
+            "I am here to support your emotional wellness. Let me check in with you.\n\n" + STEPS[0][1]
         )
+    })
 
-# ── Mood History ───────────────────────────────────────────
-st.markdown("---")
-st.markdown('<div class="section-header">📜 Today\'s Mood Log</div>', unsafe_allow_html=True)
-if st.session_state.mood_history:
-    st.dataframe(pd.DataFrame(st.session_state.mood_history), use_container_width=True, hide_index=True)
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
+
+if not st.session_state.done:
+    user_input = st.chat_input("Type your response here...")
+
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        idx = st.session_state.step_index
+        key, _ = STEPS[idx]
+
+        if key == "age":
+            try:
+                v = int(user_input.strip())
+                if not (1 <= v <= 120):
+                    raise ValueError
+            except ValueError:
+                st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid age between 1 and 120."})
+                st.rerun()
+
+        if key == "mood":
+            matched = next((m for m in MOODS if m.lower() == user_input.strip().lower()), None)
+            if not matched:
+                st.session_state.messages.append({"role": "assistant", "content": "Please type one of the mood options:\n\n" + "\n".join(f"- {m}" for m in MOODS)})
+                st.rerun()
+            user_input = matched
+
+        st.session_state.data[key] = user_input.strip()
+        st.session_state.step_index += 1
+
+        if st.session_state.step_index < len(STEPS):
+            st.session_state.messages.append({"role": "assistant", "content": STEPS[st.session_state.step_index][1]})
+        else:
+            d = st.session_state.data
+            note = None if d.get("note", "").upper() == "SKIP" else d.get("note", "")
+            response = MOOD_DATA[d["mood"]]
+            activity_lines = "\n".join(f"  - {a}" for a in response["activities"])
+
+            note_context = f" They shared: '{note}'" if note else ""
+            ai_support = ask_gemini(
+                f"You are a warm eldercare companion. Write a short, caring emotional support message for "
+                f"{d['name']}, a {d['age']}-year-old who is feeling {d['mood']}.{note_context} "
+                f"Be gentle, empathetic, and uplifting. Suggest 1 simple activity. Keep it under 80 words."
+            )
+
+            breathing = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(BREATHING_STEPS))
+
+            reply = (
+                f"Hello {d['name']}! Here is your personalised support.\n\n"
+                f"Mood Response\n"
+                f"-------------\n"
+                f"Mood    : {d['mood']}\n"
+                f"Message : {response['message']}\n"
+                f"Tip     : {response['tip']}\n\n"
+                f"Affirmation\n"
+                f"-----------\n"
+                f"\"{response['affirmation']}\"\n\n"
+                f"Suggested Activities\n"
+                f"--------------------\n"
+                f"{activity_lines}\n\n"
+                f"AI Support Message\n"
+                f"------------------\n"
+                f"{ai_support}\n\n"
+                f"Breathing Exercise - Box Breathing\n"
+                f"----------------------------------\n"
+                f"{breathing}\n\n"
+                "Type NEW for another check-in."
+            )
+
+            st.session_state.mood_history.append({
+                "Name": d["name"], "Age": d["age"], "Mood": d["mood"],
+                "Note": note if note else "-",
+                "Time": datetime.now().strftime("%H:%M:%S"),
+            })
+
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            st.session_state.done = True
+
+        st.rerun()
 else:
-    st.info("📭 No mood check-ins yet. Share how you feel above! 😊")
+    user_input = st.chat_input("Type NEW to start over...")
+    if user_input and user_input.strip().upper() == "NEW":
+        for key in ["step_index", "data", "messages", "done"]:
+            st.session_state.pop(key, None)
+        st.rerun()
 
-st.markdown("---")
-st.markdown("<center><small>😊 ElderCare AI · Mood Companion Agent · AgentVerse Hackathon</small></center>", unsafe_allow_html=True)
+if st.session_state.mood_history:
+    st.markdown("---")
+    st.markdown("**Today's Mood Log**")
+    st.dataframe(pd.DataFrame(st.session_state.mood_history), use_container_width=True, hide_index=True)

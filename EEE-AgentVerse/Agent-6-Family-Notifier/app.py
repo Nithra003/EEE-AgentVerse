@@ -1,279 +1,173 @@
-"""
-app.py - Main Streamlit Application
-ElderCare AI – Family Notification Agent
-Day 1 Single Agent Challenge
-"""
+"""Family Notification Agent - AI Assistant Style"""
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 import pandas as pd
+from utils import EMERGENCY_TYPES, RELATIONSHIP_OPTIONS, validate_fields, generate_report_text
+from notifications import build_notification, simulate_notification_channels, add_to_history
+from gemini_helper import ask_gemini
 
-from utils import (
-    EMERGENCY_TYPES,
-    RELATIONSHIP_OPTIONS,
-    validate_fields,
-    get_priority_badge,
-    generate_report_text,
-)
-from notifications import (
-    build_notification,
-    simulate_notification_channels,
-    add_to_history,
-)
+st.set_page_config(page_title="Family Notification Agent", layout="centered")
 
-# ──────────────────────────────────────────────
-# Page Configuration
-# ──────────────────────────────────────────────
-st.set_page_config(
-    page_title="ElderCare AI – Family Notification Agent",
-    page_icon="🚨",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# ──────────────────────────────────────────────
-# Custom CSS – Elder-friendly healthcare theme
-# ──────────────────────────────────────────────
 st.markdown("""
 <style>
-    html, body, [class*="css"] { font-size: 16px; }
-
-    .main-title {
-        font-size: 2.4rem;
-        font-weight: 800;
-        color: #C0392B;
-        text-align: center;
-        padding: 10px 0 4px 0;
+    .chat-header {
+        background: #8b0000;
+        color: white;
+        padding: 1.2rem 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
     }
-    .sub-title {
-        font-size: 1.1rem;
-        color: #555;
-        text-align: center;
-        margin-bottom: 24px;
-    }
-    .alert-card {
-        background: linear-gradient(135deg, #fff5f5, #ffe0e0);
-        border-left: 6px solid #C0392B;
-        border-radius: 12px;
-        padding: 20px 24px;
-        margin: 16px 0;
-    }
-    .alert-card h3 { color: #C0392B; margin-bottom: 8px; }
-    .alert-card p  { font-size: 1rem; margin: 4px 0; color: #333; }
-
-    .summary-card {
-        background: linear-gradient(135deg, #eafaf1, #d5f5e3);
-        border-left: 6px solid #1E8449;
-        border-radius: 12px;
-        padding: 20px 24px;
-        margin: 16px 0;
-    }
-    .summary-card h3 { color: #1E8449; }
-    .summary-card p  { font-size: 1rem; margin: 4px 0; color: #333; }
-
-    div.stButton > button {
-        font-size: 1.1rem;
-        padding: 10px 28px;
-        border-radius: 8px;
-        font-weight: 600;
-    }
-    .section-header {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #1A5276;
-        border-bottom: 2px solid #AED6F1;
-        padding-bottom: 6px;
-        margin: 24px 0 12px 0;
-    }
+    .chat-header h2 { margin: 0; font-size: 1.4rem; }
+    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
+    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
 </style>
 """, unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────
-# Session State Initialization
-# ──────────────────────────────────────────────
+st.markdown("""
+<div class="chat-header">
+    <h2>Family Notification Agent</h2>
+    <p>ElderCare AI - I will help you send emergency notifications to family members.</p>
+</div>
+""", unsafe_allow_html=True)
+
 if "history" not in st.session_state:
     st.session_state.history = []
-if "last_notification" not in st.session_state:
-    st.session_state.last_notification = None
 
-# ──────────────────────────────────────────────
-# Sidebar – Agent Info & Future Integrations
-# ──────────────────────────────────────────────
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/elderly-person.png", width=80)
-    st.markdown("### 🏥 ElderCare AI")
-    st.markdown("**Family Notification Agent**")
-    st.markdown("---")
-    st.markdown("#### 📊 Session Stats")
-    st.metric("Notifications Sent", len(st.session_state.history))
+STEPS = [
+    ("patient_name",    "What is the patient's name?"),
+    ("age",             "What is the patient's age?"),
+    ("location",        "What is the patient's current location? For example: 12, Anna Nagar, Chennai."),
+    ("emergency_type",  f"What type of emergency is this? Please type one of the following:\n\n" + "\n".join(f"- {e}" for e in EMERGENCY_TYPES)),
+    ("contact_name",    "What is the emergency contact person's name?"),
+    ("relationship",    f"What is their relationship to the patient? Options: {', '.join(RELATIONSHIP_OPTIONS)}"),
+    ("contact_number",  "What is the contact person's 10-digit mobile number?"),
+]
 
-    critical = sum(1 for h in st.session_state.history if h["Priority"] == "Critical")
-    st.metric("Critical Alerts", critical)
+if "step_index" not in st.session_state:
+    st.session_state.step_index = 0
+    st.session_state.data = {}
+    st.session_state.messages = []
+    st.session_state.done = False
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": "Hello! I am your Family Notification Assistant.\n\nI will help you send an emergency alert to the patient's family. Let me ask you a few questions.\n\n" + STEPS[0][1]
+    })
 
-    st.markdown("---")
-    st.markdown("#### 🔗 ElderCare AI Agents")
-    agents = [
-        "💊 Medicine Reminder Agent",
-        "📅 Appointment Booking Agent",
-        "🚨 Emergency Detection Agent",
-        "📋 Prescription Explainer Agent",
-        "❤️ Health Monitoring Agent",
-        "🎙️ Voice Companion Agent",
-        "🥗 Diet Planning Agent",
-        "🏃 Exercise Coach Agent",
-        "🏥 Hospital Navigation Agent",
-    ]
-    for agent in agents:
-        st.markdown(f"<small>{agent} *(coming soon)*</small>", unsafe_allow_html=True)
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-    st.markdown("---")
-    st.caption("ElderCare AI · AgentVerse Hackathon · Day 1")
+if not st.session_state.done:
+    user_input = st.chat_input("Type your answer here...")
 
-# ──────────────────────────────────────────────
-# Home Page Header
-# ──────────────────────────────────────────────
-st.markdown('<div class="main-title">🚨 ElderCare AI – Family Notification Agent</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="sub-title">'
-    'Automatically alerts family members during emergencies or important health events. '
-    'Fast · Reliable · Elder-Friendly'
-    '</div>',
-    unsafe_allow_html=True,
-)
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        idx = st.session_state.step_index
+        key, _ = STEPS[idx]
 
-col1, col2, col3 = st.columns(3)
-col1.metric("👨‍👩‍👧 Families Protected", "1,240+")
-col2.metric("🚨 Alerts Sent Today", "87")
-col3.metric("⚡ Avg Response Time", "< 30 sec")
+        # Validate age
+        if key == "age":
+            try:
+                age_val = int(user_input.strip())
+                if not (1 <= age_val <= 120):
+                    st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid age between 1 and 120."})
+                    st.rerun()
+            except ValueError:
+                st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid age number."})
+                st.rerun()
 
-st.markdown("---")
+        # Validate emergency type
+        if key == "emergency_type":
+            matched = next((e for e in EMERGENCY_TYPES if e.lower() == user_input.strip().lower()), None)
+            if not matched:
+                st.session_state.messages.append({"role": "assistant", "content": f"Please type one of the valid emergency types:\n\n" + "\n".join(f"- {e}" for e in EMERGENCY_TYPES)})
+                st.rerun()
+            user_input = matched
 
-# ──────────────────────────────────────────────
-# Section 1 – Patient & Emergency Information Form
-# ──────────────────────────────────────────────
-st.markdown('<div class="section-header">📋 Patient & Emergency Information</div>', unsafe_allow_html=True)
+        # Validate relationship
+        if key == "relationship":
+            matched = next((r for r in RELATIONSHIP_OPTIONS if r.lower() == user_input.strip().lower()), None)
+            if not matched:
+                st.session_state.messages.append({"role": "assistant", "content": f"Please type one of: {', '.join(RELATIONSHIP_OPTIONS)}"})
+                st.rerun()
+            user_input = matched
 
-with st.form("emergency_form", clear_on_submit=False):
-    col_a, col_b = st.columns(2)
+        # Validate phone
+        if key == "contact_number":
+            import re
+            if not re.fullmatch(r"\d{10}", user_input.strip()):
+                st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid 10-digit mobile number."})
+                st.rerun()
 
-    with col_a:
-        patient_name = st.text_input("👤 Patient Name", placeholder="e.g. Rajamani Krishnan")
-        age = st.number_input("🎂 Age", min_value=1, max_value=120, value=70, step=1)
-        location = st.text_input("📍 Current Location", placeholder="e.g. 12, Anna Nagar, Chennai")
-        emergency_type = st.selectbox("🚨 Emergency Type", [""] + EMERGENCY_TYPES)
+        st.session_state.data[key] = user_input.strip()
+        st.session_state.step_index += 1
 
-    with col_b:
-        contact_name = st.text_input("👥 Emergency Contact Name", placeholder="e.g. Karthik Rajamani")
-        relationship = st.selectbox("🤝 Relationship", [""] + RELATIONSHIP_OPTIONS)
-        contact_number = st.text_input("📞 Contact Number", placeholder="10-digit mobile number")
+        if st.session_state.step_index < len(STEPS):
+            st.session_state.messages.append({"role": "assistant", "content": STEPS[st.session_state.step_index][1]})
+        else:
+            d = st.session_state.data
+            notification = build_notification(
+                d["patient_name"], int(d["age"]), d["emergency_type"],
+                d["location"], d["contact_name"], d["relationship"], d["contact_number"]
+            )
+            st.session_state.history = add_to_history(st.session_state.history, notification)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    submitted = st.form_submit_button("🚨 Send Notification", use_container_width=True)
+            channels = simulate_notification_channels(notification["priority"])
+            channel_lines = "\n".join(f"- {msg}" for _, msg, _ in channels)
 
-# ──────────────────────────────────────────────
-# Form Submission Handling
-# ──────────────────────────────────────────────
-if submitted:
-    errors = validate_fields(
-        patient_name, age, contact_name, relationship,
-        contact_number, location, emergency_type
-    )
+            ai_msg = ask_gemini(
+                f"Generate a short urgent emergency notification message for a family member. "
+                f"Patient: {d['patient_name']}, Age: {d['age']}, Emergency: {d['emergency_type']}, "
+                f"Location: {d['location']}. Contact: {d['contact_name']} ({d['relationship']}). "
+                f"Priority: {notification['priority']}. Keep it under 60 words. Be clear and calm."
+            )
 
-    if errors:
-        for err in errors:
-            st.error(f"❌ {err}")
-    else:
-        # Build notification
-        notification = build_notification(
-            patient_name, age, emergency_type,
-            location, contact_name, relationship, contact_number
-        )
-        st.session_state.last_notification = notification
-        st.session_state.history = add_to_history(st.session_state.history, notification)
+            reply = (
+                f"Emergency notification sent successfully.\n\n"
+                f"Notification Summary\n"
+                f"--------------------\n"
+                f"Patient        : {notification['patient_name']}\n"
+                f"Age            : {notification['age']}\n"
+                f"Emergency      : {notification['emergency_type']}\n"
+                f"Priority       : {notification['priority']}\n"
+                f"Location       : {notification['location']}\n"
+                f"Contact Person : {notification['contact_name']} ({notification['relationship']})\n"
+                f"Contact Number : {notification['contact_number']}\n"
+                f"Date and Time  : {notification['date']} at {notification['time']}\n"
+                f"Status         : {notification['status']}\n\n"
+                f"Notification Channels\n"
+                f"---------------------\n"
+                f"{channel_lines}\n\n"
+                f"AI Generated Message\n"
+                f"--------------------\n"
+                f"{ai_msg}\n\n"
+                "Type NEW to send another notification."
+            )
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            st.session_state.done = True
+            st.session_state._notification = notification
 
-        st.success("✅ Emergency notification generated successfully!")
+        st.rerun()
+else:
+    user_input = st.chat_input("Type NEW to start over...")
+    if user_input and user_input.strip().upper() == "NEW":
+        for key in ["step_index", "data", "messages", "done", "_notification"]:
+            st.session_state.pop(key, None)
+        st.rerun()
 
-        # ── Alert Card ──────────────────────────────
-        st.markdown('<div class="section-header">🚨 Emergency Notification</div>', unsafe_allow_html=True)
-        priority_badge = get_priority_badge(notification["priority"])
-
-        st.markdown(f"""
-        <div class="alert-card">
-            <h3>🚨 Emergency Alert – {notification['emergency_type']}</h3>
-            <p>👤 <b>Patient:</b> {notification['patient_name']} &nbsp;|&nbsp; Age: {notification['age']}</p>
-            <p>📍 <b>Location:</b> {notification['location']}</p>
-            <p>🕐 <b>Date & Time:</b> {notification['date']} at {notification['time']}</p>
-            <p>👥 <b>Contact:</b> {notification['contact_name']} ({notification['relationship']})</p>
-            <p>📞 <b>Number:</b> {notification['contact_number']}</p>
-            <p>{priority_badge} <b>Priority:</b> {notification['priority']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── Notification Simulation ──────────────────
-        st.markdown('<div class="section-header">📡 Notification Simulation</div>', unsafe_allow_html=True)
-        channels = simulate_notification_channels(notification["priority"])
-        for icon, msg, status in channels:
-            if status == "success":
-                st.success(f"{icon} {msg}")
-            else:
-                st.warning(f"{icon} ⚠️ {msg} (slight delay detected)")
-
-        # ── Emergency Summary Card ───────────────────
-        st.markdown('<div class="section-header">📊 Emergency Summary</div>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="summary-card">
-            <h3>✅ Notification Summary</h3>
-            <p>👤 <b>Patient:</b> {notification['patient_name']}</p>
-            <p>🚨 <b>Emergency:</b> {notification['emergency_type']}</p>
-            <p>📍 <b>Location:</b> {notification['location']}</p>
-            <p>👥 <b>Contact Person:</b> {notification['contact_name']}</p>
-            <p>📞 <b>Contact Number:</b> {notification['contact_number']}</p>
-            <p>{priority_badge} <b>Priority:</b> {notification['priority']}</p>
-            <p>✅ <b>Status:</b> Sent</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── Download Report ──────────────────────────
-        report_text = generate_report_text(notification)
+    if "_notification" in st.session_state:
+        report_text = generate_report_text(st.session_state._notification)
+        n = st.session_state._notification
         st.download_button(
-            label="📥 Download Emergency Report",
+            "Download Emergency Report",
             data=report_text,
-            file_name=f"emergency_report_{notification['date']}_{notification['time'].replace(':', '-')}.txt",
+            file_name=f"emergency_report_{n['date']}_{n['time'].replace(':', '-')}.txt",
             mime="text/plain",
-            use_container_width=True,
         )
-
-# ──────────────────────────────────────────────
-# Section 2 – Notification History
-# ──────────────────────────────────────────────
-st.markdown("---")
-st.markdown('<div class="section-header">📜 Notification History</div>', unsafe_allow_html=True)
 
 if st.session_state.history:
-    df = pd.DataFrame(st.session_state.history)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    st.info(f"📊 Total notifications this session: **{len(st.session_state.history)}**")
-else:
-    st.info("📭 No notifications sent yet. Fill the form above to get started.")
-
-# ──────────────────────────────────────────────
-# Footer
-# ──────────────────────────────────────────────
-st.markdown("---")
-st.markdown(
-    "<center><small>🏥 ElderCare AI · Family Notification Agent · "
-    "AgentVerse Hackathon · Day 1 Single Agent Challenge</small></center>",
-    unsafe_allow_html=True,
-)
-
-# ──────────────────────────────────────────────
-# Future Integration Points (DO NOT IMPLEMENT)
-# ──────────────────────────────────────────────
-# TODO: Medicine Reminder Agent  – show missed medicine schedule on sidebar
-# TODO: Appointment Booking Agent – auto-book after High/Critical alert
-# TODO: Emergency Detection Agent – replace form with live sensor feed
-# TODO: Prescription Explainer Agent – attach prescription PDF to report
-# TODO: Health Monitoring Agent   – live vitals dashboard on home page
-# TODO: Voice Companion Agent     – add "Read Aloud" button for elder users
-# TODO: Diet Planning Agent       – post-alert diet suggestion panel
-# TODO: Exercise Coach Agent      – safe exercise plan after recovery
-# TODO: Hospital Navigation Agent – map widget showing nearest hospital
+    st.markdown("---")
+    st.markdown("**Notification History**")
+    st.dataframe(pd.DataFrame(st.session_state.history), use_container_width=True, hide_index=True)
