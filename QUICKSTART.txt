@@ -1,0 +1,22 @@
+#!/bin/bash
+# Quick start script for Elder-AI
+# Run this to start the emergency response system
+
+echo "=================================="
+echo "Elder-AI Emergency Detection System"
+echo "=================================="
+echo ""
+echo "This script will start both agents."
+echo "Open two separate terminal windows."
+echo ""
+echo "TERMINAL 1 - Start Response Agent:"
+echo "  python response_agent.py"
+echo ""
+echo "TERMINAL 2 - Start Detection Agent:"
+echo "  python detection_agent.py"
+echo ""
+echo "After Response Agent starts, copy its address and set:"
+echo "  SET RESPONSE_AGENT_ADDRESS=<agent-address>"
+echo ""
+echo "Then start the Detection Agent in Terminal 2"
+echo "=================================="
