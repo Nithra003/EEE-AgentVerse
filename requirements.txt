@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 aiohttp>=3.9.0
 pydantic>=2.7.0
 uagents>=0.1.0
+=======
+uagents==0.17.0
+pydantic==2.5.0
+python-dotenv==1.0.0
+>>>>>>> 4b3877c40201ff8a8eacb874f0d974caf49c2856

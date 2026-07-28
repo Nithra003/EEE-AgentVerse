@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 =========================================
 HEALTH REPORT
 =========================================
@@ -42,3 +43,232 @@ Timestamp
 2026-07-28 10:30 AM
 
 =========================================
+=======
+==================================================
+ELDER-AI: Emergency Detection System - Sample Output
+==================================================
+
+This file demonstrates the expected console output when running the 
+Elder Care Emergency Detection System.
+
+SCENARIO: Fall detected in a monitored elderly person
+
+==================================================
+TERMINAL 1: Response Agent Startup
+==================================================
+
+==================================================
+Emergency Response Agent Started
+Agent Address: agent1qdgcfr8w0gz6d7j82s9fqpxgz7f3l4u5r7k9m2b3c5d7e9f0g1h2j3k4l5m6n7p8
+==================================================
+Listening for emergency alerts...
+
+
+
+==================================================
+TERMINAL 2: Detection Agent Startup and Monitoring
+==================================================
+
+==================================================
+Starting Emergency Detection Agent...
+Agent Address: agent1q2gsrxjge37z3uwdsvl3k0r2xdcl4u5r7k9m2b3c5d7e9f0g1h2j3k4l5m6n7p8
+Waiting for Response Agent to connect...
+==================================================
+
+--- Reading #1 ---
+Movement: high
+Posture: standing
+Time on ground: 2 seconds
+✓ Status: Safe
+Waiting for next reading...
+
+--- Reading #2 ---
+Movement: low
+Posture: sitting
+Time on ground: 5 seconds
+✓ Status: Safe
+Waiting for next reading...
+
+--- Reading #3 ---
+Movement: none
+Posture: lying
+Time on ground: 25 seconds
+⚠️  Emergency detected!
+Sending alert to Response Agent...
+Alert sent successfully!
+Waiting for next reading...
+
+
+
+==================================================
+TERMINAL 1: Emergency Response (Same moment as Reading #3)
+==================================================
+
+==================================
+🚨 EMERGENCY ALERT
+==================================
+Person     : John Doe
+Status     : Fall Detected
+Location   : Living Room
+Risk Level : HIGH
+Time       : 2026-07-27 10:15:32
+----------------------------------
+Sensor Data:
+  Movement      : none
+  Posture       : lying
+  Time on Ground: 25s
+==================================
+
+⚠️  FALL DETECTED - INITIATING EMERGENCY PROTOCOL
+
+Calling emergency contacts...
+📞 Emergency Contact #1: Jane Doe (Daughter)
+📞 Emergency Contact #2: St. Mary's Hospital
+
+🚑 Ambulance notified.
+🚑 Estimated arrival: 8 minutes
+
+📋 Incident logged and recorded.
+
+==================================
+
+
+==================================================
+TERMINAL 2: Continued Monitoring
+==================================================
+
+--- Reading #4 ---
+Movement: high
+Posture: standing
+Time on ground: 1 seconds
+✓ Status: Safe
+Waiting for next reading...
+
+--- Reading #5 ---
+Movement: none
+Posture: lying
+Time on ground: 45 seconds
+⚠️  Emergency detected!
+Sending alert to Response Agent...
+Alert sent successfully!
+Waiting for next reading...
+
+
+
+==================================================
+TERMINAL 1: Second Emergency Response
+==================================================
+
+==================================
+🚨 EMERGENCY ALERT
+==================================
+Person     : John Doe
+Status     : Fall Detected
+Location   : Living Room
+Risk Level : HIGH
+Time       : 2026-07-27 10:15:53
+----------------------------------
+Sensor Data:
+  Movement      : none
+  Posture       : lying
+  Time on Ground: 45s
+==================================
+
+⚠️  FALL DETECTED - INITIATING EMERGENCY PROTOCOL
+
+Calling emergency contacts...
+📞 Emergency Contact #1: Jane Doe (Daughter)
+📞 Emergency Contact #2: St. Mary's Hospital
+
+🚑 Ambulance notified.
+🚑 Estimated arrival: 8 minutes
+
+📋 Incident logged and recorded.
+
+==================================
+
+
+==================================================
+KEY OBSERVATIONS FROM THIS OUTPUT
+==================================================
+
+1. Agent Initialization:
+   - Both agents start and display their unique addresses
+   - Response Agent listens for incoming alerts
+   - Detection Agent begins monitoring
+
+2. Normal Readings (Safe):
+   - Display sensor data with no emergency
+   - Status marked as "✓ Status: Safe"
+   - No alerts sent to Response Agent
+
+3. Emergency Detection:
+   - Triggered when: posture="lying" AND movement="none" AND time_on_ground > 20
+   - Reading #3: time_on_ground=25s → EMERGENCY
+   - Reading #5: time_on_ground=45s → EMERGENCY
+
+4. Emergency Response:
+   - Formatted alert with all relevant information
+   - Emergency protocol initiated
+   - Contact information displayed
+   - Ambulance notified with ETA
+   - Incident logged
+
+5. Message Exchange:
+   - Detection Agent → EmergencyAlert Message → Response Agent
+   - Response Agent processes and displays alert
+   - Both agents continue operating independently
+
+
+==================================================
+RUNNING THIS SYSTEM
+==================================================
+
+To reproduce this output:
+
+Terminal 1 (Response Agent):
+$ python response_agent.py
+
+Terminal 2 (Detection Agent):
+$ python detection_agent.py
+
+The system will simulate random sensor readings every 8 seconds.
+Approximately 30% of readings will trigger emergency scenarios.
+
+
+==================================================
+EMERGENCY DETECTION RULES
+==================================================
+
+FALL DETECTED (Emergency) when ALL conditions are true:
+  ✓ posture == "lying"
+  ✓ movement == "none"
+  ✓ time_on_ground > 20 seconds
+
+SAFE (No Emergency) when:
+  - Any of the above conditions is false
+  - Person is standing or sitting
+  - Person is moving normally
+  - Time on ground is less than 20 seconds
+
+
+==================================================
+MESSAGE MODEL
+==================================================
+
+EmergencyAlert {
+  person_name: "John Doe"
+  status: "Fall Detected" | "Safe"
+  location: "Living Room"
+  risk_level: "HIGH" | "MEDIUM" | "LOW"
+  timestamp: "2026-07-27 10:15:32"
+  movement: "none" | "low" | "high"
+  posture: "lying" | "sitting" | "standing"
+  time_on_ground: 25  # seconds
+}
+
+
+==================================================
+End of Sample Output
+==================================================
+>>>>>>> 4b3877c40201ff8a8eacb874f0d974caf49c2856

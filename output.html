@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elder-AI System Output</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #e0e0e0;
+            font-size: 1.1em;
+        }
+        
+        .content {
+            padding: 30px;
+            line-height: 1.8;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            background: #2d2d2d;
+            color: #4ec9b0;
+            padding: 12px 15px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        
+        .terminal-output {
+            background: #0d0d0d;
+            border: 1px solid #333;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .emergency {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        
+        .success {
+            color: #51cf66;
+        }
+        
+        .warning {
+            color: #ffd43b;
+        }
+        
+        .info {
+            color: #74c0fc;
+        }
+        
+        .emoji {
+            font-size: 1.2em;
+        }
+        
+        .separator {
+            border-top: 2px solid #333;
+            margin: 20px 0;
+        }
+        
+        .terminal-1 {
+            border-left: 4px solid #ff6b6b;
+        }
+        
+        .terminal-2 {
+            border-left: 4px solid #51cf66;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .grid-item {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .grid-item h3 {
+            color: #4ec9b0;
+            margin-bottom: 10px;
+        }
+        
+        .grid-item ul {
+            list-style-position: inside;
+            color: #d4d4d4;
+        }
+        
+        .grid-item li {
+            margin-bottom: 8px;
+        }
+        
+        .code-block {
+            background: #0d0d0d;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        
+        .button-group {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #333;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+        
+        .status-emergency {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .status-safe {
+            background: #51cf66;
+            color: white;
+        }
+        
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .terminal-output {
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Elder-AI System Output</h1>
+            <p>Emergency Detection & Response System - Sample Output</p>
+        </div>
+        
+        <div class="content">
+            <!-- Scenario Overview -->
+            <div class="section">
+                <div class="section-title">📋 Scenario Overview</div>
+                <div class="terminal-output">
+This demonstration shows the Elder Care Emergency Detection System in action.
+A fall is detected in a monitored elderly person, triggering the emergency protocol.
+
+System Architecture:
+  Detection Agent → EmergencyAlert Message → Response Agent
+                                    ↓
+                          Emergency Protocol Activated
+                                    ↓
+                          Emergency Contacts Called
+                          Ambulance Notified</div>
+            </div>
+            
+            <!-- Terminal 1: Response Agent -->
+            <div class="section">
+                <div class="section-title"><span class="emoji">📡</span> Terminal 1: Response Agent Startup</div>
+                <div class="terminal-output terminal-1">
+<span class="info">==================================================</span>
+<span class="info">🏥 Emergency Response Agent Started</span>
+<span class="info">==================================================</span>
+Agent Address: agent1qdgcfr8w0gz6d7j82s9fqpxgz7f3l4u5r7k9m2b3c5d7e9f0g1h2j3k4l5m6n7p8
+
+To connect Detection Agent, set environment variable:
+  <span class="warning">SET RESPONSE_AGENT_ADDRESS=agent1qdgcfr8w0gz6d7j82s9fqpxgz7f3l4u5r7k9m2b3c5d7e9f0g1h2j3k4l5m6n7p8</span>
+
+<span class="info">Listening for emergency alerts...</span>
+<span class="info">==================================================</span>
+                </div>
+            </div>
+            
+            <!-- Terminal 2: Detection Agent -->
+            <div class="section">
+                <div class="section-title"><span class="emoji">📡</span> Terminal 2: Detection Agent Startup & Monitoring</div>
+                <div class="terminal-output terminal-2">
+<span class="info">==================================================</span>
+<span class="info">👴 Emergency Detection Agent Started</span>
+<span class="info">==================================================</span>
+Agent Address: agent1q2gsrxjge37z3uwdsvl3k0r2xdcl4u5r7k9m2b3c5d7e9f0g1h2j3k4l5m6n7p8
+Response Agent: agent1qdgcfr8w0gz6d7j82s9fqpxgz7f3l4u5r7k9m2b3c5d7e9f0g1h2j3k4l5m6n7p8
+
+Starting continuous monitoring...
+(Reading sensor data every 8 seconds)
+<span class="info">==================================================</span>
+
+<span class="info">--- Sensor Reading ---</span>
+Movement: <span class="warning">high</span>
+Posture: <span class="success">standing</span>
+Time on ground: <span class="success">2 seconds</span>
+<span class="success">✓ Status: Safe</span>
+Waiting for next reading...
+
+<span class="info">--- Sensor Reading ---</span>
+Movement: <span class="warning">low</span>
+Posture: <span class="success">sitting</span>
+Time on ground: <span class="success">5 seconds</span>
+<span class="success">✓ Status: Safe</span>
+Waiting for next reading...
+
+<span class="info">--- Sensor Reading ---</span>
+Movement: <span class="emergency">none</span>
+Posture: <span class="emergency">lying</span>
+Time on ground: <span class="emergency">25 seconds</span>
+<span class="emergency">⚠️  Emergency detected!</span>
+<span class="emergency">Sending alert to Response Agent...</span>
+<span class="success">✓ Alert sent successfully!</span>
+Waiting for next reading...
+                </div>
+            </div>
+            
+            <!-- Emergency Alert Response -->
+            <div class="section">
+                <div class="section-title"><span class="emoji">🚨</span> Emergency Response in Terminal 1</div>
+                <div class="terminal-output terminal-1">
+<span class="emergency">==================================</span>
+<span class="emergency">🚨 EMERGENCY ALERT</span>
+<span class="emergency">==================================</span>
+Person     : <span class="warning">John Doe</span>
+Status     : <span class="emergency">Fall Detected</span>
+Location   : <span class="warning">Living Room</span>
+Risk Level : <span class="emergency">HIGH</span>
+Time       : 2026-07-27 10:15:32
+----------------------------------
+Sensor Data:
+  Movement      : <span class="emergency">none</span>
+  Posture       : <span class="emergency">lying</span>
+  Time on Ground: <span class="emergency">25s</span>
+<span class="emergency">==================================</span>
+
+<span class="emergency">⚠️  FALL DETECTED - INITIATING EMERGENCY PROTOCOL</span>
+
+<span class="warning">Calling emergency contacts...</span>
+<span class="warning">📞 Emergency Contact #1: Jane Doe (Daughter)</span>
+<span class="warning">📞 Emergency Contact #2: St. Mary's Hospital</span>
+
+<span class="success">🚑 Ambulance notified.</span>
+<span class="success">🚑 Estimated arrival: 8 minutes</span>
+
+<span class="success">📋 Incident logged and recorded.</span>
+
+<span class="emergency">==================================</span>
+                </div>
+            </div>
+            
+            <!-- Detection Rules -->
+            <div class="section">
+                <div class="section-title">🔍 Emergency Detection Rules</div>
+                <div class="grid">
+                    <div class="grid-item">
+                        <h3>🚨 FALL DETECTED (Emergency)</h3>
+                        <p>When <strong>ALL</strong> conditions are true:</p>
+                        <ul>
+                            <li>✓ posture == "lying"</li>
+                            <li>✓ movement == "none"</li>
+                            <li>✓ time_on_ground > 20 seconds</li>
+                        </ul>
+                    </div>
+                    <div class="grid-item">
+                        <h3>✓ SAFE (No Emergency)</h3>
+                        <p>When <strong>ANY</strong> condition is false:</p>
+                        <ul>
+                            <li>Person is standing or sitting</li>
+                            <li>Person is moving normally</li>
+                            <li>Time on ground is ≤ 20 seconds</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Message Model -->
+            <div class="section">
+                <div class="section-title">📦 EmergencyAlert Message Model</div>
+                <div class="code-block">
+{
+  "person_name": "John Doe",
+  "status": "Fall Detected" | "Safe",
+  "location": "Living Room",
+  "risk_level": "HIGH" | "MEDIUM" | "LOW",
+  "timestamp": "2026-07-27 10:15:32",
+  "movement": "none" | "low" | "high",
+  "posture": "lying" | "sitting" | "standing",
+  "time_on_ground": 25  # seconds
+}
+                </div>
+            </div>
+            
+            <!-- System Statistics -->
+            <div class="section">
+                <div class="section-title">📊 System Statistics</div>
+                <div class="grid">
+                    <div class="grid-item">
+                        <h3>Monitoring Interval</h3>
+                        <p><strong>8 seconds</strong> between sensor readings</p>
+                    </div>
+                    <div class="grid-item">
+                        <h3>Emergency Rate</h3>
+                        <p><strong>~30%</strong> of readings trigger emergency</p>
+                    </div>
+                    <div class="grid-item">
+                        <h3>Response Time</h3>
+                        <p><strong>Immediate</strong> alert transmission</p>
+                    </div>
+                    <div class="grid-item">
+                        <h3>Ambulance ETA</h3>
+                        <p><strong>8 minutes</strong> estimated arrival</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- How to Run -->
+            <div class="section">
+                <div class="section-title">🚀 How to Run This System</div>
+                <div class="terminal-output">
+Step 1: Install dependencies
+  $ pip install -r requirements.txt
+
+Step 2: Start Response Agent (Terminal 1)
+  $ python response_agent.py
+
+Step 3: Start Detection Agent (Terminal 2)
+  $ python detection_agent.py
+
+Step 4: Observe emergency detection and response
+  - System simulates sensor data every 8 seconds
+  - Approximately 30% of readings trigger emergencies
+  - Watch for formatted emergency alerts and responses
+                </div>
+            </div>
+            
+            <!-- Key Features -->
+            <div class="section">
+                <div class="section-title">✨ Key Features</div>
+                <div class="terminal-output">
+✅ Real-time Monitoring       - Continuous sensor data analysis
+✅ Multi-criteria Detection   - Posture + Movement + Time validation
+✅ Asynchronous Messaging     - Reliable agent-to-agent communication
+✅ Emergency Protocols        - Contact calls and ambulance notification
+✅ Incident Logging           - All emergencies recorded for analysis
+✅ Graceful Error Handling    - Recovers from connection failures
+✅ Pydantic Validation        - Type-safe message exchanges
+✅ Production-Ready Code      - Complete, documented, no placeholders
+                </div>
+            </div>
+            
+            <!-- Technology Stack -->
+            <div class="section">
+                <div class="section-title">🛠️ Technology Stack</div>
+                <div class="grid">
+                    <div class="grid-item">
+                        <h3>Framework</h3>
+                        <ul>
+                            <li><strong>uAgents</strong> 0.17.0</li>
+                            <li>Agent framework by Fetch.ai</li>
+                        </ul>
+                    </div>
+                    <div class="grid-item">
+                        <h3>Data Validation</h3>
+                        <ul>
+                            <li><strong>Pydantic</strong> 2.5.0</li>
+                            <li>Type-safe models</li>
+                        </ul>
+                    </div>
+                    <div class="grid-item">
+                        <h3>Language</h3>
+                        <ul>
+                            <li><strong>Python</strong> 3.9+</li>
+                            <li>Async/await support</li>
+                        </ul>
+                    </div>
+                    <div class="grid-item">
+                        <h3>Configuration</h3>
+                        <ul>
+                            <li><strong>python-dotenv</strong> 1.0.0</li>
+                            <li>Environment management</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="button-group">
+                <button class="btn" onclick="alert('Elder-AI System\nMulti-Agent Emergency Detection for Elder Care\n\nReady for Fetch.ai Agentverse Hackathon!')">
+                    ℹ️ About
+                </button>
+                <button class="btn" onclick="window.location.href='../README.md'">
+                    📖 Documentation
+                </button>
+                <button class="btn" onclick="window.location.href='../sample_output.txt'">
+                    📄 Raw Output
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
