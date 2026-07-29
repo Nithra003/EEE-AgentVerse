@@ -12,7 +12,14 @@
         "food": "before sleep"
       }
     ],
-    "dose_log": [],
+    "dose_log": [
+      {
+        "medicine": "Dolo",
+        "status": "taken",
+        "time": "2026-07-29 08:43",
+        "note": ""
+      }
+    ],
     "created": "2026-07-28"
   }
 }
