@@ -10,17 +10,22 @@ def _normalize_message(user_message: str) -> str:
 
 
 def generate_ai_response(patient_name: str, user_message: str, mood: str) -> str:
-    """Generate AI response using Gemini with fallback to rule-based."""
+    """Generate AI response using Gemini with rule-based fallback."""
     name = (patient_name or "friend").strip()
+    msg  = (user_message or "").strip()
+    if not msg:
+        return f"I'm here with you, {name}. Feel free to share anything on your mind."
+
     prompt = (
-        f"You are a warm, caring eldercare voice companion. "
-        f"The patient's name is {name}, age-related context: elderly, current mood: {mood}. "
-        f"They said: '{user_message}'. "
-        f"Respond with empathy, warmth, and encouragement. Keep it under 80 words. "
-        f"Do not give medical advice. Be conversational and kind."
+        f"You are a warm, patient eldercare voice companion named Companion. "
+        f"The patient's name is {name} (elderly). Current mood: {mood}. "
+        f"They said: '{msg}'. "
+        f"Respond with genuine empathy and warmth. "
+        f"If they mention pain, discomfort, or a health concern, gently suggest they speak to their doctor or caregiver. "
+        f"Do not give medical advice. Keep response under 80 words. Be conversational and kind."
     )
     ai_response = ask_gemini(prompt)
-    if ai_response and "Unable to generate" not in ai_response:
+    if ai_response and "unavailable" not in ai_response.lower() and "Unable" not in ai_response:
         return ai_response
     # Fallback
     parts = [random.choice(GREETING_MESSAGES).format(name=name)]

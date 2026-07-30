@@ -1,0 +1,32 @@
+# ── Core framework ────────────────────────────────────────────────────────────
+streamlit>=1.35.0
+pydantic>=2.7.0
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.30
+apscheduler>=3.10.4
+
+# ── AI / LLM (local via Ollama — no API keys) ─────────────────────────────────
+requests>=2.32.0          # Ollama HTTP client
+
+# ── OCR ───────────────────────────────────────────────────────────────────────
+easyocr>=1.7.1
+pytesseract>=0.3.13
+opencv-python-headless>=4.9.0
+Pillow>=10.3.0
+numpy>=1.26.0
+
+# ── Translation ───────────────────────────────────────────────────────────────
+langdetect>=1.0.9
+transformers>=4.41.0
+torch>=2.3.0              # CPU-only; install torch+cpu wheel if GPU not needed
+sentencepiece>=0.2.0      # required by NLLB-200 tokeniser
+protobuf>=4.25.0
+
+# ── Voice ─────────────────────────────────────────────────────────────────────
+openai-whisper>=20231117
+TTS>=0.22.0               # Coqui TTS
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.1
+pandas>=2.2.0

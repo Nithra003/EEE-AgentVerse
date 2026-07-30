@@ -2,126 +2,25 @@
 
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import asyncio
 import streamlit as st
 from datetime import datetime
-
-st.set_page_config(page_title="Health Report Agent", layout="centered")
-
-st.markdown("""
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
-  html, body, [data-testid="stAppViewContainer"] {
-    background: #060b14 !important;
-    font-family: 'Inter', sans-serif;
-  }
-  [data-testid="stHeader"], footer, #MainMenu { display: none; }
-
-  .top-bar {
-    background: linear-gradient(135deg, #0d1a2e, #0a1220);
-    border: 1px solid #1a2840;
-    border-radius: 16px;
-    padding: 1.4rem 1.6rem;
-    margin-bottom: 1.5rem;
-    display: flex; align-items: center; gap: 1rem;
-  }
-  .top-bar-icon {
-    width: 48px; height: 48px; border-radius: 12px;
-    background: linear-gradient(135deg, #0c2a4a, #071828);
-    border: 1px solid #38bdf8;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.4rem;
-    box-shadow: 0 0 20px rgba(56,189,248,0.25);
-    flex-shrink: 0;
-  }
-  .top-bar-title { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; }
-  .top-bar-sub   { font-size: 0.78rem; color: #556677; margin-top: 0.2rem; }
-
-  .card {
-    background: #0d1526;
-    border: 1px solid #1a2840;
-    border-radius: 14px;
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 1rem;
-    animation: fadeIn 0.4s ease;
-  }
-
-  .card-title {
-    font-size: 0.65rem; font-weight: 700;
-    letter-spacing: 0.15em; text-transform: uppercase;
-    color: #38bdf8; margin-bottom: 0.9rem;
-  }
-
-  .metric-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-  }
-
-  @media (max-width: 480px) {
-    .metric-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  .metric-card {
-    background: #0a0f1a;
-    border: 1px solid #1a2840;
-    border-radius: 12px;
-    padding: 0.9rem 0.7rem;
-    text-align: center;
-  }
-
-  .metric-label { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #445566; margin-bottom: 0.3rem; }
-  .metric-value { font-size: 1rem; font-weight: 700; color: #dde8f5; }
-  .metric-status { font-size: 0.65rem; margin-top: 0.2rem; }
-
-  .status-normal   { color: #4ade80; }
-  .status-high     { color: #f87171; }
-  .status-low      { color: #fbbf24; }
-  .status-critical { color: #f87171; font-weight: 700; }
-  .status-fever    { color: #fb923c; }
-  .status-fair     { color: #fbbf24; }
-  .status-poor     { color: #f87171; }
-  .status-active   { color: #4ade80; }
-
-  .risk-low      { color: #4ade80; }
-  .risk-medium   { color: #fbbf24; }
-  .risk-high     { color: #f87171; }
-
-  .detail-row {
-    display: flex; justify-content: space-between;
-    padding: 0.5rem 0; border-bottom: 1px solid #0d1526;
-    font-size: 0.82rem;
-  }
-  .detail-key   { color: #445566; }
-  .detail-value { color: #dde8f5; font-weight: 600; }
-
-  .reco-item {
-    padding: 0.4rem 0; font-size: 0.82rem; color: #7a8fa8;
-    border-bottom: 1px solid #0d1526;
-  }
-  .reco-item::before { content: "— "; color: #38bdf8; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-</style>
-""", unsafe_allow_html=True)
-
-from models import HealthData, HealthMetricStatus, HealthReport
 from health_report_agent import HealthReportAgent
+from shared.agent_bridge import health_report_to_diet_exercise
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
-st.markdown("""
-<div class="top-bar">
-  <div class="top-bar-icon">📊</div>
-  <div>
-    <div class="top-bar-title">Health Report Agent</div>
-    <div class="top-bar-sub">ElderCare AI — Wearable data analysis and risk classification</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Health Report Agent", layout="wide")
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="health")
+agent_header(
+    title="📊 Health Report Agent",
+    subtitle="ElderCare AI — Wearable data analysis and risk classification",
+    accent="#38bdf8",
+)
 
 # --- Input Form ---
 with st.expander("Enter Patient Health Data", expanded=True):
@@ -141,7 +40,6 @@ with st.expander("Enter Patient Health Data", expanded=True):
 
 if generate or "report" in st.session_state:
     if generate:
-        import asyncio
         agent = HealthReportAgent()
         payload = {
             "patient_name": patient_name,
@@ -156,6 +54,13 @@ if generate or "report" in st.session_state:
         }
         report = asyncio.run(agent.receive_health_data(payload))
         st.session_state.report = report
+        health_report_to_diet_exercise(
+            patient_name=report.patient_name,
+            age=report.age,
+            condition=report.overall_status,
+            risk_level=report.risk_level,
+            recommendations=report.recommendations,
+        )
 
     report = st.session_state.report
 

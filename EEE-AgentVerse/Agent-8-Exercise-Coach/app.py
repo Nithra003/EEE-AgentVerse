@@ -7,33 +7,52 @@ import pandas as pd
 from exercise_data import CONDITIONS, FITNESS_LEVELS, WEEKLY_SCHEDULE, get_exercise_plan
 from utils import generate_report_text
 from gemini_helper import ask_gemini
+from shared.agent_bridge import get_health_report_events, get_mood_events
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
-st.set_page_config(page_title="Exercise Coach Agent", layout="centered")
-
-st.markdown("""
-<style>
-    .chat-header {
-        background: #1a3c5e;
-        color: white;
-        padding: 1.2rem 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
-    .chat-header h2 { margin: 0; font-size: 1.4rem; }
-    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
-    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="chat-header">
-    <h2>Exercise Coach Agent</h2>
-    <p>ElderCare AI - I will create a safe, personalized exercise plan for your patient.</p>
-</div>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Exercise Coach Agent", layout="wide")
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="exercise")
+agent_header(
+    title="🏃 Exercise Coach Agent",
+    subtitle="ElderCare AI — Safe, personalized exercise plans for elderly patients",
+    accent="#60a5fa",
+)
 
 if "exercise_history" not in st.session_state:
     st.session_state.exercise_history = []
+
+# ── Incoming events from Health Report Agent ───────────────────────────────────
+_hr_events = get_health_report_events("Agent-8-Exercise-Coach")
+if _hr_events:
+    _ev = _hr_events[-1]
+    _p  = _ev["payload"]
+    st.info(
+        f"📊 **Health Report received** — {_p.get('patient_name','')}, "
+        f"Age {_p.get('age','')}, Condition: {_p.get('condition','')}, "
+        f"Risk: {_p.get('risk_level','')} | {_ev['timestamp']}"
+    )
+
+# ── Incoming events from Mood Companion Agent ──────────────────────────────────
+_mood_events = get_mood_events()
+if _mood_events:
+    _ev = _mood_events[-1]
+    _p  = _ev["payload"]
+    _mood_advice = {
+        "Tired":      "Low-intensity stretching only today.",
+        "Anxious":    "Gentle breathing exercises recommended.",
+        "Sad":        "Light walk outdoors can help lift mood.",
+        "Frustrated": "Brisk walk to release tension.",
+        "Happy":      "Great day for your full exercise routine!",
+        "Lonely":     "Group or outdoor activity encouraged.",
+    }.get(_p.get("mood", ""), "Adapt intensity to current mood.")
+    st.warning(
+        f"😊 **Mood update from Mood Companion** — "
+        f"{_p.get('patient_name','')} is feeling **{_p.get('mood','')}**. "
+        f"Suggestion: {_mood_advice}"
+    )
 
 STEPS = [
     ("name",          "What is the patient's name?"),
@@ -76,12 +95,16 @@ if not st.session_state.done:
         if key == "condition":
             matched = next((c for c in CONDITIONS if c.lower() == user_input.strip().lower()), None)
             if not matched:
+                matched = next((c for c in CONDITIONS if user_input.strip().lower() in c.lower()), None)
+            if not matched:
                 st.session_state.messages.append({"role": "assistant", "content": "Please type one of the listed conditions:\n\n" + "\n".join(f"- {c}" for c in CONDITIONS)})
                 st.rerun()
             user_input = matched
 
         if key == "fitness_level":
             matched = next((f for f in FITNESS_LEVELS if f.lower() == user_input.strip().lower()), None)
+            if not matched:
+                matched = next((f for f in FITNESS_LEVELS if user_input.strip().lower() in f.lower()), None)
             if not matched:
                 st.session_state.messages.append({"role": "assistant", "content": f"Please type one of: {', '.join(FITNESS_LEVELS)}"})
                 st.rerun()
@@ -101,12 +124,14 @@ if not st.session_state.done:
                 for e in plan["exercises"]
             )
             precaution_lines = "\n".join(f"  - {p}" for p in plan["precautions"])
-            schedule_lines = "\n".join(f"  {day:12}: {task}" for day, task in WEEKLY_SCHEDULE.items())
+            schedule_lines   = "\n".join(f"  {day:12}: {task}" for day, task in WEEKLY_SCHEDULE.items())
 
             ai_advice = ask_gemini(
-                f"You are an eldercare fitness coach. Give personalized exercise advice for a {d['age']}-year-old "
-                f"named {d['name']} with {d['condition']} at {d['fitness_level']} fitness level. "
-                f"Give 3 specific exercise tips, 1 safety reminder, and 1 motivational line. Keep it under 120 words. Be encouraging."
+                f"You are an expert eldercare fitness coach. Give safe, personalised exercise advice for "
+                f"{d['name']}, a {d['age']}-year-old with {d['condition']} at {d['fitness_level']} fitness level. "
+                f"Provide: 3 specific exercise tips with modifications for their condition, "
+                f"1 critical safety reminder, 1 warm-up suggestion, and 1 motivational sentence. "
+                f"Keep it under 130 words. Use simple, encouraging language."
             )
 
             reply = (

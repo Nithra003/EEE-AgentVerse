@@ -7,33 +7,34 @@ import pandas as pd
 from utils import EMERGENCY_TYPES, RELATIONSHIP_OPTIONS, validate_fields, generate_report_text
 from notifications import build_notification, simulate_notification_channels, add_to_history
 from gemini_helper import ask_gemini
+from shared.agent_bridge import get_emergency_events
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
-st.set_page_config(page_title="Family Notification Agent", layout="centered")
-
-st.markdown("""
-<style>
-    .chat-header {
-        background: #8b0000;
-        color: white;
-        padding: 1.2rem 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
-    .chat-header h2 { margin: 0; font-size: 1.4rem; }
-    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
-    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="chat-header">
-    <h2>Family Notification Agent</h2>
-    <p>ElderCare AI - I will help you send emergency notifications to family members.</p>
-</div>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Family Notification Agent", layout="wide")
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="family")
+agent_header(
+    title="👨‍👩‍👧 Family Notification Agent",
+    subtitle="ElderCare AI — Instant emergency alerts to family members",
+    accent="#fb923c",
+)
 
 if "history" not in st.session_state:
     st.session_state.history = []
+
+# ── Incoming events from Emergency Detection Agent ─────────────────────────────
+_em_events = get_emergency_events()
+if _em_events:
+    for _ev in _em_events:
+        _p = _ev["payload"]
+        st.error(
+            f"🚨 **Auto-alert from Emergency Detection Agent** — "
+            f"{_p.get('patient_name','Unknown')} | {_p.get('status','Fall Detected')} | "
+            f"Location: {_p.get('location','Unknown')} | Risk: {_p.get('risk_level','HIGH')} | "
+            f"{_ev['timestamp']}"
+        )
 
 STEPS = [
     ("patient_name",    "What is the patient's name?"),
@@ -67,7 +68,6 @@ if not st.session_state.done:
         idx = st.session_state.step_index
         key, _ = STEPS[idx]
 
-        # Validate age
         if key == "age":
             try:
                 age_val = int(user_input.strip())
@@ -78,23 +78,24 @@ if not st.session_state.done:
                 st.session_state.messages.append({"role": "assistant", "content": "Please enter a valid age number."})
                 st.rerun()
 
-        # Validate emergency type
         if key == "emergency_type":
             matched = next((e for e in EMERGENCY_TYPES if e.lower() == user_input.strip().lower()), None)
+            if not matched:
+                matched = next((e for e in EMERGENCY_TYPES if user_input.strip().lower() in e.lower()), None)
             if not matched:
                 st.session_state.messages.append({"role": "assistant", "content": f"Please type one of the valid emergency types:\n\n" + "\n".join(f"- {e}" for e in EMERGENCY_TYPES)})
                 st.rerun()
             user_input = matched
 
-        # Validate relationship
         if key == "relationship":
             matched = next((r for r in RELATIONSHIP_OPTIONS if r.lower() == user_input.strip().lower()), None)
+            if not matched:
+                matched = next((r for r in RELATIONSHIP_OPTIONS if user_input.strip().lower() in r.lower()), None)
             if not matched:
                 st.session_state.messages.append({"role": "assistant", "content": f"Please type one of: {', '.join(RELATIONSHIP_OPTIONS)}"})
                 st.rerun()
             user_input = matched
 
-        # Validate phone
         if key == "contact_number":
             import re
             if not re.fullmatch(r"\d{10}", user_input.strip()):
@@ -118,10 +119,13 @@ if not st.session_state.done:
             channel_lines = "\n".join(f"- {msg}" for _, msg, _ in channels)
 
             ai_msg = ask_gemini(
-                f"Generate a short urgent emergency notification message for a family member. "
+                f"You are an eldercare emergency notification AI. Write a concise, calm, and urgent "
+                f"notification message for a family member. "
                 f"Patient: {d['patient_name']}, Age: {d['age']}, Emergency: {d['emergency_type']}, "
                 f"Location: {d['location']}. Contact: {d['contact_name']} ({d['relationship']}). "
-                f"Priority: {notification['priority']}. Keep it under 60 words. Be clear and calm."
+                f"Priority: {notification['priority']}. "
+                f"Include: what happened, where, and what the family member should do next. "
+                f"Keep it under 60 words. Be clear, calm, and compassionate."
             )
 
             reply = (

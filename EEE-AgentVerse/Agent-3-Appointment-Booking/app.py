@@ -1,36 +1,25 @@
 # app.py - ElderCare AI Agent - Appointment Booking
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 from agent import AppointmentAgent
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
-st.set_page_config(page_title="Appointment Booking Agent", layout="centered")
+st.set_page_config(page_title="Appointment Booking Agent", layout="wide")
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="appointment")
+agent_header(
+    title="📅 Appointment Booking Agent",
+    subtitle="ElderCare AI — Book doctor appointments step by step",
+    accent="#34d399",
+)
 
-st.markdown("""
-<style>
-    body { font-family: Arial, sans-serif; }
-    .chat-header {
-        background: #0d6e6e;
-        color: white;
-        padding: 1.2rem 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
-    .chat-header h2 { margin: 0; font-size: 1.4rem; }
-    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
-    .stChatMessage p { font-size: 1.05rem !important; line-height: 1.8 !important; }
-    .emergency-box {
-        background: #fff0f0;
-        border: 2px solid #cc0000;
-        border-radius: 8px;
-        padding: 1rem 1.2rem;
-        font-size: 1.05rem;
-    }
-    section[data-testid="stSidebar"] { background: #e8f5f5; }
-</style>
-""", unsafe_allow_html=True)
-
-# Sidebar
+# Sidebar extra info
 with st.sidebar:
+    st.markdown("---")
     api_key = st.text_input(
         "Gemini API Key (Optional)",
         type="password",
@@ -38,14 +27,9 @@ with st.sidebar:
         help="Free key: https://aistudio.google.com/app/apikey",
     )
     st.caption("Used only for AI symptom analysis. Never stored.")
-    st.divider()
-
     if st.button("Start Over", use_container_width=True):
         st.session_state.clear()
         st.rerun()
-
-    st.divider()
-    st.markdown("### Agent Info")
     if "agent" in st.session_state:
         a = st.session_state.agent
         st.caption(f"Step: {a.state}")
@@ -53,23 +37,6 @@ with st.sidebar:
             st.caption(f"Patient: {a.patient['name']}")
         if a.specialty:
             st.caption(f"Specialty: {a.specialty}")
-
-    st.divider()
-    st.markdown("### How to use")
-    st.caption(
-        "1. Type your answer in the box below\n"
-        "2. Press Enter to send\n"
-        "3. Tamil also works\n"
-        "4. Click mic to speak"
-    )
-
-# Header
-st.markdown("""
-<div class="chat-header">
-    <h2>Appointment Booking Agent</h2>
-    <p>ElderCare AI - I will help you book a doctor appointment step by step.</p>
-</div>
-""", unsafe_allow_html=True)
 
 # Init agent
 if "agent" not in st.session_state:
@@ -82,10 +49,13 @@ if "agent" not in st.session_state:
 
 # Update API key if entered after load
 if api_key and st.session_state.agent.api_key != api_key:
-    import google.generativeai as genai
-    st.session_state.agent.api_key = api_key
-    genai.configure(api_key=api_key)
-    st.session_state.agent.model = genai.GenerativeModel("gemini-1.5-flash")
+    try:
+        import google.generativeai as genai
+        st.session_state.agent.api_key = api_key
+        genai.configure(api_key=api_key)
+        st.session_state.agent.model = genai.GenerativeModel("gemini-1.5-flash")
+    except Exception:
+        st.session_state.agent.api_key = api_key
 
 # Render chat history
 for msg in st.session_state.messages:

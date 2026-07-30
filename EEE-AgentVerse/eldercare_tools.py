@@ -10,16 +10,29 @@ from gemini_helper import ask_gemini
 
 _ROOT = os.path.dirname(__file__)
 
-def _add(path):
-    p = os.path.join(_ROOT, path)
-    if p not in sys.path:
-        sys.path.insert(0, p)
+# Register all agent paths once at module load — not inside each function
+for _agent_dir in [
+    "Agent-1-Medicine-Reminder",
+    "Agent-3-Appointment-Booking",
+    "Agent-4-Prescription-Explainer",
+    "Agent-5-Health-Report",
+    "Agent-6-Family-Notifier",
+    "Agent-7-Diet-Recommendation",
+    "Agent-8-Exercise-Coach",
+    "Agent-10-Voice-Assistant",
+]:
+    _p = os.path.join(_ROOT, _agent_dir)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+
+def _add(path):  # kept for backward compat — now a no-op
+    pass
 
 
 # ── TOOL 1: Medicine Reminder ─────────────────────────────────────────────────
 def tool_medicine_reminder(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-1-Medicine-Reminder")
         from agents.medicine_reminder import chat as med_chat
         name     = ctx.get("name", "Friend")
         medicine = ctx.get("medicine", "your medicine")
@@ -80,7 +93,6 @@ def tool_emergency_detection(message: str, ctx: dict) -> str:
 # ── TOOL 3: Appointment Booking ───────────────────────────────────────────────
 def tool_appointment_booking(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-3-Appointment-Booking")
         from tools import find_specialist, check_available_slots
         from doctors import SPECIALTY_INFO
 
@@ -132,7 +144,6 @@ def tool_appointment_booking(message: str, ctx: dict) -> str:
 # ── TOOL 4: Prescription Explainer ───────────────────────────────────────────
 def tool_prescription_explainer(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-4-Prescription-Explainer")
         from medicine_data import MedicineKnowledgeBase
         kb       = MedicineKnowledgeBase()
         med_name = ctx.get("medicine_name", message)
@@ -179,7 +190,6 @@ def tool_prescription_explainer(message: str, ctx: dict) -> str:
 # ── TOOL 5: Health Report ─────────────────────────────────────────────────────
 def tool_health_report(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-5-Health-Report")
         from health_report_agent import HealthReportAgent
         import asyncio
 
@@ -203,9 +213,8 @@ def tool_health_report(message: str, ctx: dict) -> str:
             "timestamp"       : datetime.utcnow().isoformat(),
         }
 
-        loop   = asyncio.new_event_loop()
-        report = loop.run_until_complete(HealthReportAgent().receive_health_data(payload))
-        loop.close()
+        # asyncio.run() handles loop lifecycle — no leak on exception
+        report = asyncio.run(HealthReportAgent().receive_health_data(payload))
 
         ai_summary = ask_gemini(
             f"Health report for {report.patient_name}, age {payload['age']}. "
@@ -247,7 +256,6 @@ def tool_health_report(message: str, ctx: dict) -> str:
 # ── TOOL 6: Family Notifier ───────────────────────────────────────────────────
 def tool_family_notifier(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-6-Family-Notifier")
         from notifications import build_notification, simulate_notification_channels
 
         valid_types = ["Missed Medicine", "High Blood Pressure", "High Blood Sugar",
@@ -308,7 +316,6 @@ def tool_family_notifier(message: str, ctx: dict) -> str:
 # ── TOOL 7: Diet Recommendation ───────────────────────────────────────────────
 def tool_diet_recommendation(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-7-Diet-Recommendation")
         from diet_data import get_diet_plan, CONDITIONS, calculate_bmi
 
         condition = ctx.get("condition", "General Wellness")
@@ -372,7 +379,6 @@ def tool_diet_recommendation(message: str, ctx: dict) -> str:
 # ── TOOL 8: Exercise Coach ────────────────────────────────────────────────────
 def tool_exercise_coach(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-8-Exercise-Coach")
         from exercise_data import get_exercise_plan, CONDITIONS, WEEKLY_SCHEDULE
 
         condition     = ctx.get("condition", "General Fitness")
@@ -536,7 +542,6 @@ def tool_mood_companion(message: str, ctx: dict) -> str:
 # ── TOOL 10: General Assistant ────────────────────────────────────────────────
 def tool_general_assistant(message: str, ctx: dict) -> str:
     try:
-        _add("Agent-10-Voice-Assistant")
         from chatbot import generate_ai_response, get_daily_motivation
         name       = ctx.get("name", "Friend")
         response   = generate_ai_response(name, message, ctx.get("mood", "Normal"))

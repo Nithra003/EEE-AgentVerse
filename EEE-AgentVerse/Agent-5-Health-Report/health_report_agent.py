@@ -186,7 +186,7 @@ class HealthReportAgent:
         spo2_critical = health_data.spo2 < 90
 
         overall_status, risk_level = self.classify_risk(abnormal_count, spo2_critical)
-        recommendations = self.build_recommendations(overall_status)
+        recommendations = self.build_recommendations(health_data, overall_status)
 
         metrics = {
             "Heart Rate": f"{health_data.heart_rate} bpm",
@@ -198,8 +198,10 @@ class HealthReportAgent:
         }
 
         summary = (
-            f"{health_data.patient_name} is classified as {overall_status} with {risk_level} risk. "
-            f"The report contains actionable guidance for caregiver or emergency response follow-up."
+            f"{health_data.patient_name} (age {health_data.age}) is classified as "
+            f"{overall_status} with {risk_level} risk. "
+            f"{len([s for s in metric_status.values() if s not in {HealthMetricStatus.NORMAL, HealthMetricStatus.ACTIVE}])} "
+            f"metric(s) need attention. Follow the recommendations below and consult your doctor if symptoms worsen."
         )
 
         return HealthReport(
@@ -229,17 +231,23 @@ class HealthReportAgent:
         return HealthMetricStatus.CRITICAL
 
     def analyze_temperature(self, temperature: float) -> HealthMetricStatus:
-        if 36.5 <= temperature <= 37.5:
+        if 36.1 <= temperature <= 37.2:
             return HealthMetricStatus.NORMAL
+        if temperature >= 39.0:
+            return HealthMetricStatus.CRITICAL
         return HealthMetricStatus.FEVER
 
     def analyze_blood_pressure(self, blood_pressure: str) -> HealthMetricStatus:
         try:
-            systolic, diastolic = (int(value) for value in blood_pressure.split("/"))
-        except ValueError:
-            logging.error("Invalid blood pressure format: %s", blood_pressure)
+            parts = blood_pressure.strip().split("/")
+            if len(parts) != 2:
+                raise ValueError
+            systolic, diastolic = int(parts[0]), int(parts[1])
+        except (ValueError, AttributeError):
+            logging.warning("Invalid blood pressure format: %s", blood_pressure)
             return HealthMetricStatus.HIGH
-
+        if systolic >= 180 or diastolic >= 120:
+            return HealthMetricStatus.CRITICAL
         if systolic < 140 and diastolic < 90:
             return HealthMetricStatus.NORMAL
         return HealthMetricStatus.HIGH
@@ -257,32 +265,31 @@ class HealthReportAgent:
         return HealthMetricStatus.POOR
 
     def classify_risk(self, abnormal_count: int, spo2_critical: bool) -> tuple[str, str]:
-        if spo2_critical or abnormal_count >= 3:
+        if spo2_critical or abnormal_count >= 4:
             return "Critical", "High"
-        if abnormal_count in {1, 2}:
+        if abnormal_count >= 2:
             return "Needs Monitoring", "Medium"
         return "Healthy", "Low"
 
-    def build_recommendations(self, overall_status: str) -> List[str]:
-        if overall_status == "Healthy":
-            return [
-                "Continue regular exercise.",
-                "Stay hydrated.",
-                "Maintain healthy sleep.",
-            ]
-        if overall_status == "Needs Monitoring":
-            return [
-                "Monitor blood pressure.",
-                "Increase daily walking.",
-                "Improve sleep schedule.",
-                "Drink enough water.",
-            ]
-        return [
-            "Contact caregiver immediately.",
-            "Seek medical attention.",
-            "Monitor oxygen saturation.",
-            "Avoid strenuous activity.",
-        ]
+    def build_recommendations(self, health_data: "HealthData", overall_status: str) -> List[str]:
+        recs = []
+        if health_data.heart_rate > 100:
+            recs.append("Heart rate is elevated. Rest and avoid caffeine. Consult doctor if persistent.")
+        elif health_data.heart_rate < 60:
+            recs.append("Heart rate is low. Avoid strenuous activity and consult your doctor.")
+        if health_data.spo2 < 95:
+            recs.append("Oxygen level is low. Sit upright, breathe slowly. Seek medical attention if below 90%.")
+        if health_data.body_temperature > 37.2:
+            recs.append("Temperature is elevated. Stay hydrated, rest, and monitor closely.")
+        if health_data.steps < 3000:
+            recs.append("Low activity today. A short 10-minute walk can improve circulation.")
+        if health_data.sleep_hours < 6:
+            recs.append("Sleep is below recommended. Aim for 7–8 hours for better recovery.")
+        if overall_status == "Healthy" and not recs:
+            recs = ["Continue regular exercise.", "Stay hydrated.", "Maintain healthy sleep schedule."]
+        elif overall_status == "Critical":
+            recs.insert(0, "Contact caregiver or doctor immediately.")
+        return recs or ["Monitor vitals regularly and stay hydrated."]
 
     async def dispatch_report(self, report: HealthReport) -> None:
         if report.risk_level == "High":

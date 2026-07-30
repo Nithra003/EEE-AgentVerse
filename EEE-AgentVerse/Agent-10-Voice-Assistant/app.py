@@ -1,93 +1,72 @@
 """Voice Companion Agent - AI Assistant Style"""
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 from chatbot import generate_ai_response, get_daily_motivation, get_wellness_suggestions
 from responses import get_industry_notes, get_intro_text
 from utils import create_history_dataframe, format_timestamp, validate_patient_form
+from shared.agent_bridge import get_reminder_events, get_appointment_events
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
-st.set_page_config(page_title="Voice Companion Agent", layout="centered")
-
-st.markdown("""
-<style>
-    .chat-header {
-        background: #2c5f2e;
-        color: white;
-        padding: 1.2rem 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
-    .chat-header h2 { margin: 0; font-size: 1.4rem; }
-    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
-    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
-    .stButton>button {
-        background-color: #2c5f2e;
-        color: white;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-    }
-    .stTextInput>div>div>input { border-radius: 8px; }
-    .stSelectbox>div>div>div { border-radius: 8px; }
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Voice Companion Agent", layout="wide")
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="voice")
+agent_header(
+    title="🎙️ Voice Companion Agent",
+    subtitle="ElderCare AI — A calm, kind assistant for conversation and daily wellness",
+    accent="#2dd4bf",
+)
 
 
 def initialize_session_state() -> None:
     defaults = {
-        "patient_name": "",
-        "age": "",
-        "gender": "",
-        "mood": "",
-        "conversation_history": [],
-        "motivation_quote": "",
-        "chat_ready": False,
+        "patient_name": "", "age": "", "gender": "", "mood": "",
+        "conversation_history": [], "motivation_quote": "", "chat_ready": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
 
-def render_header() -> None:
-    st.markdown("""
-    <div class="chat-header">
-        <h2>Voice Companion Agent</h2>
-        <p>ElderCare AI - A calm, kind assistant for conversation, emotional support, and daily wellness encouragement.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    st.write(get_intro_text())
+def render_incoming_events() -> None:
+    rem_events = get_reminder_events()
+    for ev in rem_events:
+        p = ev["payload"]
+        st.info(
+            f"💊 **Medicine Reminder** — {p.get('patient_name','')} should take "
+            f"**{p.get('medicine','')}** at {p.get('time','')} | {ev['timestamp']}"
+        )
+
+    apt_events = get_appointment_events()
+    for ev in apt_events:
+        p = ev["payload"]
+        st.success(
+            f"📅 **Appointment Confirmed** — {p.get('patient_name','')} with "
+            f"Dr. {p.get('doctor','')} ({p.get('specialty','')}) on "
+            f"{p.get('date','')} at {p.get('time','')} | ID: {p.get('apt_id','')} | {ev['timestamp']}"
+        )
 
 
 def render_patient_form() -> None:
     st.subheader("Patient Information")
     st.write("Please enter a few details so the companion can greet you warmly and offer helpful support.")
 
-    mood_options = [
-        ("Happy", "Happy"),
-        ("Normal", "Normal"),
-        ("Sad", "Sad"),
-        ("Anxious", "Anxious"),
-        ("Tired", "Tired"),
-        ("Lonely", "Lonely"),
-    ]
+    mood_options = [("Happy","Happy"),("Normal","Normal"),("Sad","Sad"),
+                    ("Anxious","Anxious"),("Tired","Tired"),("Lonely","Lonely")]
 
     with st.form("patient_form", clear_on_submit=False):
         col1, col2 = st.columns([2, 1])
         with col1:
-            patient_name = st.text_input(
-                "Patient Name",
-                value=st.session_state.patient_name,
-                placeholder="Enter name",
-            )
+            patient_name = st.text_input("Patient Name", value=st.session_state.patient_name, placeholder="Enter name")
         with col2:
-            age = st.text_input(
-                "Age",
-                value=str(st.session_state.age) if st.session_state.age != "" else "",
-                placeholder="Enter age",
-            )
+            age = st.text_input("Age", value=str(st.session_state.age) if st.session_state.age != "" else "", placeholder="Enter age")
 
         gender = st.selectbox(
-            "Gender",
-            options=["Female", "Male", "Non-binary", "Prefer not to say"],
-            index=0 if st.session_state.gender == "" else ["Female", "Male", "Non-binary", "Prefer not to say"].index(st.session_state.gender),
+            "Gender", options=["Female","Male","Non-binary","Prefer not to say"],
+            index=0 if st.session_state.gender == "" else ["Female","Male","Non-binary","Prefer not to say"].index(st.session_state.gender),
         )
         mood_label = st.selectbox("Current Mood", options=[item[0] for item in mood_options])
         mood_value = dict(mood_options)[mood_label]
@@ -118,10 +97,7 @@ def render_chat_interface() -> None:
 
     if not st.session_state.conversation_history:
         with st.chat_message("assistant"):
-            st.write(
-                f"Hello {st.session_state.patient_name}! I am here with you today. "
-                f"How are you feeling right now?"
-            )
+            st.write(f"Hello {st.session_state.patient_name}! I am here with you today. How are you feeling right now?")
 
     for entry in st.session_state.conversation_history:
         with st.chat_message("user"):
@@ -139,13 +115,11 @@ def render_chat_interface() -> None:
                 user_message=prompt,
                 mood=st.session_state.mood,
             )
-            st.session_state.conversation_history.append(
-                {
-                    "time": format_timestamp(),
-                    "user_message": prompt.strip(),
-                    "ai_response": ai_response,
-                }
-            )
+            st.session_state.conversation_history.append({
+                "time": format_timestamp(),
+                "user_message": prompt.strip(),
+                "ai_response": ai_response,
+            })
             st.rerun()
 
 
@@ -174,7 +148,6 @@ def render_wellness_section() -> None:
 def render_history_section() -> None:
     if not st.session_state.chat_ready:
         return
-
     st.markdown("---")
     st.subheader("Conversation History")
     history_df = create_history_dataframe(st.session_state.conversation_history)
@@ -183,7 +156,7 @@ def render_history_section() -> None:
 
 def main() -> None:
     initialize_session_state()
-    render_header()
+    render_incoming_events()
     render_patient_form()
     render_chat_interface()
     render_wellness_section()

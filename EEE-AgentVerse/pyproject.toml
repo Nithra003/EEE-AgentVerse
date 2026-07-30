@@ -1,0 +1,57 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--cov=Agent-3-Appointment-Booking",
+    "--cov=Agent-1-Medicine-Reminder",
+    "--cov=Agent-4-Prescription-Explainer",
+    "--cov=Agent-10-Voice-Assistant",
+    "--cov=Agent-11-Medical-Assistant",
+    "--cov-report=term-missing",
+    "--cov-report=html:coverage_html",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=95",
+]
+markers = [
+    "unit: pure unit tests",
+    "integration: multi-module integration tests",
+    "ocr: OCR pipeline tests",
+    "ai: AI engine tests",
+    "reminder: reminder service tests",
+    "appointment: appointment booking tests",
+    "voice: voice assistant tests",
+    "database: database layer tests",
+]
+
+[tool.coverage.run]
+source = [
+    "Agent-3-Appointment-Booking",
+    "Agent-1-Medicine-Reminder",
+    "Agent-4-Prescription-Explainer",
+    "Agent-10-Voice-Assistant",
+    "Agent-11-Medical-Assistant",
+]
+omit = [
+    "*/app.py",
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/sample_output*",
+    "*/demo_data*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass$",
+    "\\.\\.\\.$",
+]
+show_missing = true
+skip_covered = false

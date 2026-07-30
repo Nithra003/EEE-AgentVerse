@@ -10,6 +10,22 @@
         "dosage": "1",
         "time": "10.17 PM",
         "food": "before sleep"
+      },
+      {
+        "name": "Paracitamal",
+        "dosage": "2 tablet",
+        "time": "8.00 PM",
+        "food": "after food",
+        "frequency": "Specific Days",
+        "days": [
+          "Mon",
+          "Thu",
+          "Sat"
+        ],
+        "start_date": "2026-07-29",
+        "end_date": "2026-08-10",
+        "quantity": 30,
+        "follow_up_date": "2026-07-29"
       }
     ],
     "dose_log": [

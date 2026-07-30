@@ -7,8 +7,11 @@ Emergency Detection Agent for Elder Care System
 
 import random
 import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from datetime import datetime
 from uagents import Agent, Context, Model
+from shared.agent_bridge import emergency_to_family
 
 
 class EmergencyAlert(Model):
@@ -93,6 +96,12 @@ async def monitor(ctx: Context):
         risk_level = "HIGH"
         print("Status         : Emergency detected!")
         print("Sending alert to Response Agent...")
+        emergency_to_family(
+            patient_name="John Doe",
+            location="Living Room",
+            risk_level=risk_level,
+            status=status,
+        )
     else:
         risk_level = "LOW"
         print("Status         : Safe")

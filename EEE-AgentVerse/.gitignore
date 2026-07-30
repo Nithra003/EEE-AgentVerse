@@ -1,0 +1,61 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+!.env.example
+*.key
+*.pem
+secrets.json
+
+# ── User data (PII) ───────────────────────────────────────────────────────────
+Agent-1-Medicine-Reminder/users_data.json
+shared/events.json
+Agent-11-Medical-Assistant/data/
+Agent-11-Medical-Assistant/logs/
+logs/
+
+# ── Database files ────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Coverage & test artifacts ─────────────────────────────────────────────────
+.coverage
+coverage.xml
+coverage_html/
+.pytest_cache/
+htmlcov/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Streamlit ─────────────────────────────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ── ML model caches ───────────────────────────────────────────────────────────
+*.pt
+*.bin
+*.onnx
+Agent-11-Medical-Assistant/assets/sounds/*.wav
+Agent-11-Medical-Assistant/data/uploads/

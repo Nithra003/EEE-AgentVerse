@@ -1,57 +1,22 @@
 """💊 Medicine Reminder AI Agent — Login + Personal Profile"""
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime
-import users
-from agents.medicine_reminder import chat, verify_medicine_image, analyze_missed_dose, get_voice_reminder_text
+from datetime import datetime, date as _date
+from users import (
+    login, register, get_user, save_medicines, get_refill_alerts,
+    get_todays_log, log_dose, get_adherence, check_missed_count, update_profile,
+)
+from agents.medicine_reminder import chat, verify_medicine_image, analyze_missed_dose, get_voice_reminder_text, analyze_prescription_image, explain_prescription_ai
+from shared.agent_bridge import get_prescription_events, reminder_to_voice
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
 st.set_page_config(page_title="💊 Medicine Reminder AI", layout="wide", page_icon="💊")
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-* { font-family: 'Inter', sans-serif; }
-[data-testid="stAppViewContainer"] { background: #f0f4f8; }
-[data-testid="stHeader"] { display: none; }
-
-.login-box {
-    max-width: 420px; margin: 3rem auto;
-    background: white; border-radius: 16px;
-    padding: 2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-}
-.login-title { text-align:center; font-size:1.5rem; font-weight:700; color:#1a3c5e; margin-bottom:0.3rem; }
-.login-sub   { text-align:center; font-size:0.85rem; color:#64748b; margin-bottom:1.5rem; }
-
-.header-box {
-    background: linear-gradient(135deg, #1a3c5e, #2d6a9f);
-    color: white; padding: 1rem 1.5rem; border-radius: 12px;
-    margin-bottom: 1rem; display:flex; justify-content:space-between; align-items:center;
-}
-.header-box h1 { margin:0; font-size:1.3rem; }
-.header-box p  { margin:0; font-size:0.82rem; opacity:0.85; }
-
-.med-card {
-    background: white; border-radius: 10px; padding: 0.8rem 1rem;
-    margin-bottom: 0.5rem; border-left: 4px solid #2d6a9f;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    display: flex; align-items: center; justify-content: space-between;
-}
-.metric-card {
-    background: white; border-radius: 10px; padding: 1rem;
-    text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-.voice-box {
-    background: #e8f4fd; border-left: 4px solid #2d6a9f;
-    padding: 0.8rem 1rem; border-radius: 8px; font-size: 0.95rem;
-}
-.alert-box {
-    background: #fff3cd; border-left: 4px solid #ffc107;
-    padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 0.4rem;
-    font-size: 0.88rem;
-}
-.stButton > button { border-radius: 8px !important; font-weight: 500 !important; }
-</style>
-""", unsafe_allow_html=True)
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="medicine")
 
 # ── Session init ──────────────────────────────────────────────────────────────
 for k, v in {"logged_in": False, "username": "", "page": "login",
@@ -70,36 +35,35 @@ def speak(text: str):
     window.speechSynthesis.speak(u);
     </script>""", height=0)
 
-def set_voice_timer(hhmm: str, speak_txt: str, r_type: str, r_date: str):
+def set_voice_timer(hhmm: str, speak_txt: str, r_type: str, r_date: str, day_check: str = "var dMatch=true;"):
     safe = speak_txt.replace("'", " ").replace('"', " ").replace("\n", " ")
-    # remove non-ascii to avoid surrogate errors
     safe = safe.encode("ascii", "ignore").decode("ascii")
     components.html(f"""
     <script>
     (function(){{
-        var target='{hhmm}', rtype='{r_type}', rdate='{r_date}';
+        var target='{hhmm}';
         function check(){{
             var now=new Date();
             var hh=String(now.getHours()).padStart(2,'0');
             var mm=String(now.getMinutes()).padStart(2,'0');
             var dd=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
             var tMatch=(hh+':'+mm===target);
-            var dMatch=(rtype==='Daily')||(dd===rdate);
+            {day_check}
             if(tMatch && dMatch){{
                 window.speechSynthesis.cancel();
                 var u=new SpeechSynthesisUtterance('{safe}');
                 u.rate=0.85; u.volume=1.0;
                 window.speechSynthesis.speak(u);
                 alert('Medicine Reminder\\n\\n{safe}');
-                if(rtype==='Daily') setTimeout(check,86400000);
-            }} else {{ setTimeout(check,20000); }}
+            }}
+            setTimeout(check, 30000);
         }}
-        setTimeout(check,10000);
+        setTimeout(check, 10000);
     }})();
     </script>
     <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:8px;
                 padding:0.7rem 1rem;font-size:0.85rem;color:#155724;">
-        Reminder set at <b>{hhmm}</b> | {r_type} - Keep this tab open!
+        ⏰ Reminder set at <b>{hhmm}</b> | {r_type} — Keep this tab open!
     </div>""", height=48)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -113,37 +77,39 @@ if not st.session_state.logged_in:
     tab_login, tab_reg = st.tabs(["🔐 Login", "📝 Register"])
 
     with tab_login:
-        u = st.text_input("Username", key="li_u")
-        p = st.text_input("Password", type="password", key="li_p")
-        if st.button("Login", use_container_width=True, type="primary"):
-            ok, result = users.login(u.strip(), p)
-            if ok:
-                st.session_state.logged_in = True
-                st.session_state.username  = u.strip().lower()
-                st.session_state.page      = "home"
-                st.session_state.chat_history = []
-                st.rerun()
-            else:
-                st.error(result)
+        with st.form("login_form"):
+            u = st.text_input("Username", key="li_u")
+            p = st.text_input("Password", type="password", key="li_p")
+            if st.form_submit_button("Login", use_container_width=True, type="primary"):
+                ok, result = login(u.strip(), p)
+                if ok:
+                    st.session_state.logged_in = True
+                    st.session_state.username  = u.strip().lower()
+                    st.session_state.page      = "home"
+                    st.session_state.chat_history = []
+                    st.rerun()
+                else:
+                    st.error(result)
 
     with tab_reg:
-        ru   = st.text_input("Username",     key="rg_u")
-        rn   = st.text_input("Full Name",    key="rg_n")
-        rage = st.number_input("Age", 1, 120, 60, key="rg_a")
-        rph  = st.text_input("Phone Number", key="rg_ph")
-        rp   = st.text_input("Password",     type="password", key="rg_p")
-        rp2  = st.text_input("Confirm Password", type="password", key="rg_p2")
-        if st.button("Register", use_container_width=True, type="primary"):
-            if rp != rp2:
-                st.error("Passwords do not match.")
-            elif len(ru.strip()) < 3:
-                st.error("Username must be at least 3 characters.")
-            else:
-                ok, msg = users.register(ru.strip(), rp, rn.strip(), int(rage), rph.strip())
-                if ok:
-                    st.success("✅ Registered! Please login.")
+        with st.form("register_form"):
+            ru   = st.text_input("Username",     key="rg_u")
+            rn   = st.text_input("Full Name",    key="rg_n")
+            rage = st.number_input("Age", 1, 120, 60, key="rg_a")
+            rph  = st.text_input("Phone Number", key="rg_ph")
+            rp   = st.text_input("Password",     type="password", key="rg_p")
+            rp2  = st.text_input("Confirm Password", type="password", key="rg_p2")
+            if st.form_submit_button("Register", use_container_width=True, type="primary"):
+                if rp != rp2:
+                    st.error("Passwords do not match.")
+                elif len(ru.strip()) < 3:
+                    st.error("Username must be at least 3 characters.")
                 else:
-                    st.error(msg)
+                    ok, msg = register(ru.strip(), rp, rn.strip(), int(rage), rph.strip())
+                    if ok:
+                        st.success("✅ Registered! Please login.")
+                    else:
+                        st.error(msg)
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
@@ -151,7 +117,7 @@ if not st.session_state.logged_in:
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGGED IN — load user
 # ══════════════════════════════════════════════════════════════════════════════
-user     = users.get_user(st.session_state.username)
+user     = get_user(st.session_state.username)
 uname    = st.session_state.username
 medicines = user.get("medicines", [])
 
@@ -184,21 +150,55 @@ st.divider()
 
 page = st.session_state.page
 
+# ── Refill / Follow-up Alerts (shown on all pages) ───────────────────────────
+refill_alerts = get_refill_alerts(uname)
+for ra in refill_alerts:
+    if ra["type"] == "refill":
+        st.warning(f"💊 Refill needed: **{ra['medicine']}** — only ~{ra['days_left']} day(s) of supply left. Buy more soon!")
+    elif ra["type"] == "end_soon":
+        st.info(f"📅 **{ra['medicine']}** course ends in {ra['days']} day(s). Consult your doctor if needed.")
+    elif ra["type"] == "follow_up":
+        st.warning(f"🏥 Doctor follow-up for **{ra['medicine']}** on {ra['date']} — {ra['days']} day(s) away!")
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: HOME — AI Chat + Today's Schedule
 # ══════════════════════════════════════════════════════════════════════════════
 if page in ["home", "🏠 Home"]:
+    # ── Incoming events from Prescription Agent ───────────────────────────────
+    rx_events = get_prescription_events()
+    if rx_events:
+        st.info(f"📋 {len(rx_events)} new prescription(s) received from Prescription Explainer Agent.")
+        for ev in rx_events:
+            p = ev["payload"]
+            meds = p.get("medicines", [])
+            if meds:
+                for m in meds:
+                    if m.get("name") and m["name"].strip():
+                        medicines.append({
+                            "name": m["name"].strip().title(),
+                            "dosage": m.get("dosage", ""),
+                            "time": m.get("frequency", "As prescribed"),
+                            "food": m.get("food_instruction", "as prescribed"),
+                            "frequency": "Daily", "days": [],
+                            "start_date": "", "end_date": "",
+                            "quantity": 30, "follow_up_date": "",
+                        })
+                save_medicines(uname, medicines)
+                st.success(f"✅ Medicines from prescription auto-added for {p.get('patient_name', 'patient')}.")
+
     col_left, col_right = st.columns([2, 1])
 
     with col_left:
         st.subheader("🤖 AI Medicine Assistant")
 
         # Today's schedule
-        today_log   = users.get_todays_log(uname)
+        today_log   = get_todays_log(uname)
         taken_today = {l["medicine"].lower() for l in today_log if l["status"] == "taken"}
 
         if medicines:
             st.markdown("#### 🔔 Today's Schedule")
+            # Compute next_med before the loop so it's always available
+            next_med = next((m for m in medicines if m["name"].lower() not in taken_today), medicines[0])
             for med in medicines:
                 mname = med["name"]
                 mkey  = mname.lower()
@@ -207,14 +207,15 @@ if page in ["home", "🏠 Home"]:
                 ca.markdown(f"{icon} **{mname}** — {med['dosage']} · {med['time']} · _{med['food']}_")
                 if mkey not in taken_today:
                     if cb.button("✅ Taken", key=f"t_{mkey}"):
-                        users.log_dose(uname, mname, "taken")
+                        log_dose(uname, mname, "taken")
+                        reminder_to_voice(user["name"], mname, med.get("time", ""))
                         st.session_state.chat_history.append({"role":"assistant",
                             "content": f"✅ Great job, {user['name']}! Recorded **{mname}** as taken. 💪"})
                         speak(f"Great job {user['name']}! You have taken {mname}. Well done!")
                         st.rerun()
                     if cc.button("❌ Missed", key=f"m_{mkey}"):
-                        missed_n = users.check_missed_count(uname, mname) + 1
-                        users.log_dose(uname, mname, "missed")
+                        missed_n = check_missed_count(uname, mname) + 1
+                        log_dose(uname, mname, "missed")
                         analysis = analyze_missed_dose(user["name"], mname, missed_n, "not specified")
                         st.session_state.chat_history.append({"role":"assistant",
                             "content": f"⚠️ Missed **{mname}**.\n\n{analysis}"})
@@ -230,7 +231,7 @@ if page in ["home", "🏠 Home"]:
         # AI Chat
         st.markdown("#### 💬 Chat with AI")
         if not st.session_state.chat_history:
-            adh = users.get_adherence(uname)
+            adh = get_adherence(uname)
             st.session_state.chat_history.append({"role":"assistant", "content":(
                 f"Hello {user['name']}! 👋 I'm your Medicine AI Assistant.\n\n"
                 f"You have **{len(medicines)} medicines** scheduled. "
@@ -253,7 +254,7 @@ if page in ["home", "🏠 Home"]:
             is_emergency = any(k in user_input.lower() for k in emergency_kw)
             forgot_kw    = ["forgot whether","don't remember","not sure if i took","did i take"]
             if any(w in user_input.lower() for w in forgot_kw):
-                taken_list = [l["medicine"] for l in users.get_todays_log(uname) if l["status"]=="taken"]
+                taken_list = [l["medicine"] for l in get_todays_log(uname) if l["status"]=="taken"]
                 ctx = f"[Today taken: {', '.join(taken_list) if taken_list else 'NONE'}]"
                 full_msg = f"{ctx}\nPatient: {user_input}"
             else:
@@ -302,7 +303,7 @@ elif page == "💊 My Medicines":
                 st.rerun()
             if cc.button("🗑️ Delete", key=f"del_{i}"):
                 medicines.pop(i)
-                users.save_medicines(uname, medicines)
+                save_medicines(uname, medicines)
                 st.rerun()
 
     st.divider()
@@ -312,19 +313,42 @@ elif page == "💊 My Medicines":
         idx = st.session_state.edit_med_idx
         med = medicines[idx]
         st.markdown(f"#### ✏️ Edit — {med['name']}")
+        food_opts = ["after food","before food","with food","any time","after lunch","before sleep"]
+        freq_opts = ["Daily","Weekly","Specific Days"]
+        day_opts  = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
         with st.form("edit_med_form"):
-            en = st.text_input("Medicine Name", value=med["name"])
-            ed = st.text_input("Dosage",        value=med["dosage"])
-            et = st.text_input("Time",          value=med["time"])
-            ef = st.selectbox("Food Instruction",
-                              ["after food","before food","with food","any time","after lunch","before sleep"],
-                              index=["after food","before food","with food","any time","after lunch","before sleep"].index(med["food"]) if med["food"] in ["after food","before food","with food","any time","after lunch","before sleep"] else 0)
             c1, c2 = st.columns(2)
-            save = c1.form_submit_button("💾 Save", use_container_width=True)
-            cancel = c2.form_submit_button("❌ Cancel", use_container_width=True)
+            en = c1.text_input("Medicine Name", value=med["name"])
+            ed = c2.text_input("Dosage",        value=med["dosage"])
+            c3, c4 = st.columns(2)
+            et = c3.text_input("Time",          value=med["time"])
+            ef = c4.selectbox("Food Instruction", food_opts,
+                              index=food_opts.index(med["food"]) if med["food"] in food_opts else 0)
+            c5, c6 = st.columns(2)
+            efreq = c5.selectbox("Frequency", freq_opts,
+                                 index=freq_opts.index(med.get("frequency","Daily")) if med.get("frequency","Daily") in freq_opts else 0)
+            edays = c6.multiselect("Days (if Specific)", day_opts, default=med.get("days",[]))
+            c7, c8 = st.columns(2)
+            from datetime import date as _date
+            def _parse_date(s, fallback):
+                try: return _date.fromisoformat(s)
+                except: return fallback
+            estart  = c7.date_input("Start Date",          value=_parse_date(med.get("start_date",""), datetime.now().date()))
+            eend    = c8.date_input("End Date",            value=_parse_date(med.get("end_date",""),   datetime.now().date()))
+            c9, c10 = st.columns(2)
+            eqty    = c9.number_input("Quantity", min_value=0, value=int(med.get("quantity",30)), step=1)
+            efollow = c10.date_input("Doctor Follow-up",   value=_parse_date(med.get("follow_up_date",""), datetime.now().date()))
+            c1b, c2b = st.columns(2)
+            save   = c1b.form_submit_button("💾 Save",   use_container_width=True)
+            cancel = c2b.form_submit_button("❌ Cancel", use_container_width=True)
         if save:
-            medicines[idx] = {"name": en.strip(), "dosage": ed.strip(), "time": et.strip(), "food": ef}
-            users.save_medicines(uname, medicines)
+            medicines[idx] = {
+                "name": en.strip(), "dosage": ed.strip(), "time": et.strip(), "food": ef,
+                "frequency": efreq, "days": edays,
+                "start_date": str(estart), "end_date": str(eend),
+                "quantity": int(eqty), "follow_up_date": str(efollow),
+            }
+            save_medicines(uname, medicines)
             st.session_state.edit_med_idx = None
             st.success("✅ Medicine updated!")
             st.rerun()
@@ -335,14 +359,31 @@ elif page == "💊 My Medicines":
     # Add new medicine
     st.markdown("#### ➕ Add New Medicine")
     with st.form("add_med_form"):
-        mn = st.text_input("Medicine Name",   placeholder="e.g. Metformin")
-        md = st.text_input("Dosage",          placeholder="e.g. 500mg, 1 tablet")
-        mt = st.text_input("Time",            placeholder="e.g. 8:00 AM")
-        mf = st.selectbox("Food Instruction", ["after food","before food","with food","any time","after lunch","before sleep"])
+        c1, c2 = st.columns(2)
+        mn  = c1.text_input("Medicine Name",   placeholder="e.g. Metformin")
+        md  = c2.text_input("Dosage",          placeholder="e.g. 500mg, 1 tablet")
+        c3, c4 = st.columns(2)
+        mt  = c3.text_input("Time",            placeholder="e.g. 8:00 AM")
+        mf  = c4.selectbox("Food Instruction", ["after food","before food","with food","any time","after lunch","before sleep"])
+        c5, c6 = st.columns(2)
+        mfreq = c5.selectbox("Frequency", ["Daily","Weekly","Specific Days"])
+        mdays = c6.multiselect("Days (if Specific)", ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"])
+        c7, c8 = st.columns(2)
+        mstart = c7.date_input("Start Date", value=datetime.now().date())
+        mend   = c8.date_input("End Date",   value=datetime.now().date())
+        c9, c10 = st.columns(2)
+        mqty    = c9.number_input("Quantity (tablets/capsules)", min_value=0, value=30, step=1)
+        mfollow = c10.date_input("Doctor Follow-up Date", value=datetime.now().date())
         if st.form_submit_button("➕ Add Medicine", use_container_width=True):
             if mn.strip():
-                medicines.append({"name": mn.strip().title(), "dosage": md.strip(), "time": mt.strip(), "food": mf})
-                users.save_medicines(uname, medicines)
+                medicines.append({
+                    "name": mn.strip().title(), "dosage": md.strip(),
+                    "time": mt.strip(), "food": mf,
+                    "frequency": mfreq, "days": mdays,
+                    "start_date": str(mstart), "end_date": str(mend),
+                    "quantity": int(mqty), "follow_up_date": str(mfollow),
+                })
+                save_medicines(uname, medicines)
                 st.success(f"✅ {mn.title()} added!")
                 st.rerun()
             else:
@@ -382,7 +423,8 @@ elif page == "⏰ Reminders":
 
         med_names   = [m["name"] for m in medicines]
         freq_opts   = ["Once", "Twice", "Three times"]
-        type_opts   = ["Daily", "Specific Date"]
+        type_opts   = ["Daily", "Weekly", "Specific Days", "Specific Date"]
+        day_opts    = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
         def_med  = edit_rem["medicine"] if edit_rem and edit_rem["medicine"] in med_names else med_names[0]
         def_freq = edit_rem["freq"]     if edit_rem and edit_rem["freq"] in freq_opts    else "Once"
@@ -396,10 +438,12 @@ elif page == "⏰ Reminders":
                 pass
 
         with st.form("reminder_form"):
-            r_med  = st.selectbox("Medicine",     med_names,  index=med_names.index(def_med))
-            r_time = st.time_input("Remind at",   value=def_time)
-            r_freq = st.selectbox("Times per day", freq_opts, index=freq_opts.index(def_freq))
-            r_type = st.radio("Type", type_opts,              index=type_opts.index(def_type), horizontal=True)
+            r_med  = st.selectbox("Medicine",      med_names,  index=med_names.index(def_med))
+            r_time = st.time_input("Remind at",    value=def_time)
+            r_freq = st.selectbox("Times per day", freq_opts,  index=freq_opts.index(def_freq))
+            r_type = st.radio("Schedule Type",     type_opts,  index=type_opts.index(def_type), horizontal=True)
+            r_days = st.multiselect("Select Days", day_opts,
+                                    default=edit_rem.get("days",[]) if edit_rem else []) if r_type == "Specific Days" else []
             r_date = st.date_input("Date", value=datetime.now().date()) if r_type == "Specific Date" else None
             c1, c2 = st.columns(2)
             submit = c1.form_submit_button("Save Reminder",  use_container_width=True)
@@ -418,20 +462,36 @@ elif page == "⏰ Reminders":
             hhmm      = r_time.strftime("%H:%M")
             date_str  = r_date.strftime("%Y-%m-%d") if r_date else ""
 
-            rem_entry = {"medicine": r_med, "time": hhmm, "freq": r_freq, "rtype": r_type, "date": date_str}
+            rem_entry = {"medicine": r_med, "time": hhmm, "freq": r_freq,
+                         "rtype": r_type, "date": date_str, "days": r_days}
             if edit_idx is not None:
                 st.session_state.active_reminders[edit_idx] = rem_entry
                 st.session_state.edit_rem_idx = None
             else:
                 st.session_state.active_reminders.append(rem_entry)
 
+            # Build JS day-of-week check for Weekly/Specific Days
+            day_map = {"Monday":1,"Tuesday":2,"Wednesday":3,"Thursday":4,"Friday":5,"Saturday":6,"Sunday":0}
+            if r_type == "Specific Days" and r_days:
+                js_days = str([day_map[d] for d in r_days])
+                day_check = f"var allowed={js_days}; var dMatch=allowed.indexOf(now.getDay())!==-1;"
+            elif r_type == "Weekly":
+                # Use the first selected day or today
+                js_days = str([day_map[r_days[0]]] if r_days else [datetime.now().weekday()])
+                day_check = f"var allowed={js_days}; var dMatch=allowed.indexOf(now.getDay())!==-1;"
+            elif r_type == "Specific Date":
+                day_check = f"var dMatch=(dd==='{date_str}');"
+            else:  # Daily
+                day_check = "var dMatch=true;"
+
             offsets = {"Once": [0], "Twice": [0, 480], "Three times": [0, 300, 600]}[r_freq]
             for off in offsets:
                 h = (r_time.hour * 60 + r_time.minute + off) // 60 % 24
                 m = (r_time.minute + off) % 60
-                set_voice_timer(f"{h:02d}:{m:02d}", speak_txt, r_type, date_str)
+                set_voice_timer(f"{h:02d}:{m:02d}", speak_txt, r_type, date_str, day_check)
 
-            st.success(f"Reminder saved for {r_med} at {hhmm} - {r_freq} - {r_type}")
+            label = f"{r_type}" + (f" ({', '.join(r_days)})" if r_days else "")
+            st.success(f"Reminder saved for {r_med} at {hhmm} — {r_freq} — {label}")
             st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -439,7 +499,7 @@ elif page == "⏰ Reminders":
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "📊 Dashboard":
     st.subheader(f"📊 Adherence Dashboard — {user['name']}")
-    adh = users.get_adherence(uname)
+    adh = get_adherence(uname)
     c1,c2,c3,c4 = st.columns(4)
     c1.markdown(f'<div class="metric-card"><h2>{adh["total"]}</h2><p>Total</p></div>', unsafe_allow_html=True)
     c2.markdown(f'<div class="metric-card"><h2 style="color:#38a169">✅ {adh["taken"]}</h2><p>Taken</p></div>', unsafe_allow_html=True)
@@ -507,6 +567,6 @@ elif page == "👤 Profile":
         pph = st.text_input("Phone Number", value=user.get("phone",""))
         st.text_input("Username", value=uname, disabled=True)
         if st.form_submit_button("💾 Save Profile", use_container_width=True):
-            users.update_profile(uname, pn.strip(), int(pa), pph.strip())
+            update_profile(uname, pn.strip(), int(pa), pph.strip())
             st.success("✅ Profile updated!")
             st.rerun()

@@ -2,11 +2,19 @@
 #
 # PERCEIVE -> THINK -> ACT -> RESPOND
 # Simple plain English questions for elder citizens.
-# Uses Gemini LLM for symptom analysis only.
+# Uses multi-model AI engine: Qwen3 -> DeepSeek -> Llama -> keyword fallback
 
 import re
-import google.generativeai as genai
+import sys
+import os
+from ai_engine import AIEngine
 from tools import find_specialist, check_available_slots, book_appointment, build_confirmation_text
+
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from shared.agent_bridge import appointment_to_voice as _appointment_to_voice
+except Exception:
+    _appointment_to_voice = None
 
 STATE_GREETING    = "greeting"
 STATE_GET_INFO    = "get_info"
@@ -27,12 +35,12 @@ class AppointmentAgent:
     """
     AI Agent for appointment booking.
     - Simple plain English questions step by step.
-    - Uses Gemini LLM for symptom analysis.
-    - Falls back to weighted keyword tool if no API key.
+    - Uses multi-model AI engine (Qwen3 -> DeepSeek -> Llama -> keyword fallback).
+    - Never crashes, never exposes model errors to users.
     """
 
     def __init__(self, api_key: str = ""):
-        self.api_key     = api_key
+        self.api_key     = api_key   # kept for UI compatibility
         self.state       = STATE_GREETING
         self.patient     = {}
         self.specialty   = None
@@ -40,12 +48,7 @@ class AppointmentAgent:
         self.slots       = []
         self.appointment = None
         self.history     = []
-
-        if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel("gemini-1.5-flash")
-        else:
-            self.model = None
+        self.engine      = AIEngine()
 
     # -----------------------------------------------------------------------
     # Main entry — PERCEIVE -> THINK -> ACT -> RESPOND
@@ -53,6 +56,7 @@ class AppointmentAgent:
     def process(self, user_input: str) -> dict:
         user_input = user_input.strip()
         self.history.append({"role": "user", "content": user_input})
+        self.engine.add_to_memory("user", user_input)
 
         if self._is_emergency(user_input):
             return self._emergency_response()
@@ -75,6 +79,7 @@ class AppointmentAgent:
             response = self._respond("Type NEW to start over.")
 
         self.history.append({"role": "agent", "content": response["message"]})
+        self.engine.add_to_memory("agent", response["message"])
         return response
 
     # -----------------------------------------------------------------------
@@ -155,13 +160,11 @@ class AppointmentAgent:
         return self._respond("All information collected.")
 
     def _handle_analyse(self) -> dict:
-        """THINK + ACT: Gemini or keyword tool analyses symptoms."""
+        """THINK + ACT: AI engine analyses symptoms with automatic model fallback."""
         symptoms = self.patient.get("symptoms", "")
-
-        if self.model:
-            result = self._gemini_analyse(symptoms)
-        else:
-            result = find_specialist(symptoms)
+        age      = self.patient.get("age", 60)
+        gender   = self.patient.get("gender", "unknown")
+        result   = self.engine.analyse_symptoms(symptoms, age=age, gender=gender)
 
         self.specialty = result["specialty"]
         self.doctors   = result["doctors"]
@@ -257,6 +260,18 @@ class AppointmentAgent:
                 time      = self.patient["time"],
             )
             self.state = STATE_DONE
+            if _appointment_to_voice:
+                try:
+                    _appointment_to_voice(
+                        patient_name=self.patient["name"],
+                        doctor=self.patient["doctor"],
+                        specialty=self.specialty,
+                        date=self.patient["date"],
+                        time=self.patient["time"],
+                        apt_id=self.appointment["apt_id"],
+                    )
+                except Exception:
+                    pass
             return self._respond(
                 f"Your appointment is confirmed!\n\n"
                 f"Appointment ID: {self.appointment['apt_id']}\n\n"
@@ -290,39 +305,11 @@ class AppointmentAgent:
         )
 
     # -----------------------------------------------------------------------
-    # Gemini symptom analysis (LLM used only here)
+    # Prescription understanding (delegates to AI engine)
     # -----------------------------------------------------------------------
-    def _gemini_analyse(self, symptoms: str) -> dict:
-        try:
-            from doctors import get_all_specialties, DOCTORS, SPECIALTY_INFO
-            specialties = ", ".join(get_all_specialties())
-            prompt = (
-                f"Patient symptoms: \"{symptoms}\".\n"
-                f"Available specialties: {specialties}.\n"
-                "Reply in exactly two lines:\n"
-                "Line 1: Best matching specialty (exact name from list).\n"
-                "Line 2: Short patient-friendly reason (1 sentence, in English)."
-            )
-            response  = self.model.generate_content(prompt)
-            lines     = [l.strip() for l in response.text.strip().splitlines() if l.strip()]
-            specialty = lines[0] if lines else "General Physician"
-            reason    = lines[1] if len(lines) > 1 else "Recommended based on your symptoms."
-
-            if specialty not in get_all_specialties():
-                raise ValueError("Unknown specialty")
-
-            doctors = DOCTORS.get(specialty, DOCTORS["General Physician"])
-            info    = SPECIALTY_INFO.get(specialty, {"icon": "🏥", "desc": ""})
-            return {
-                "specialty":      specialty,
-                "confidence":     92,
-                "icon":           info["icon"],
-                "description":    reason,
-                "doctors":        [d["name"] for d in doctors],
-                "doctor_details": doctors,
-            }
-        except Exception:
-            return find_specialist(symptoms)
+    def explain_prescription(self, prescription_text: str) -> dict:
+        age = self.patient.get("age", 60)
+        return self.engine.explain_prescription(prescription_text, age=age)
 
     # -----------------------------------------------------------------------
     # Helpers
@@ -352,4 +339,5 @@ class AppointmentAgent:
         }
 
     def reset(self):
+        self.engine.clear_memory()
         self.__init__(self.api_key)

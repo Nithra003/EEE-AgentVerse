@@ -7,30 +7,19 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from gemini_helper import ask_gemini
+from shared.agent_bridge import mood_to_exercise
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
-st.set_page_config(page_title="Mood Companion Agent", layout="centered")
-
-st.markdown("""
-<style>
-    .chat-header {
-        background: #4a235a;
-        color: white;
-        padding: 1.2rem 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
-    .chat-header h2 { margin: 0; font-size: 1.4rem; }
-    .chat-header p  { margin: 0.3rem 0 0; font-size: 0.9rem; opacity: 0.85; }
-    .stChatMessage p { font-size: 1rem; line-height: 1.7; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="chat-header">
-    <h2>Mood Companion Agent</h2>
-    <p>ElderCare AI - I am here to support your emotional wellness and daily positivity.</p>
-</div>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Mood Companion Agent", layout="wide")
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="mood")
+agent_header(
+    title="😊 Mood Companion Agent",
+    subtitle="ElderCare AI — Emotional wellness and daily positivity support",
+    accent="#e879f9",
+)
 
 MOOD_DATA = {
     "Happy": {
@@ -177,6 +166,8 @@ if not st.session_state.done:
         if key == "mood":
             matched = next((m for m in MOODS if m.lower() == user_input.strip().lower()), None)
             if not matched:
+                matched = next((m for m in MOODS if user_input.strip().lower() in m.lower()), None)
+            if not matched:
                 st.session_state.messages.append({"role": "assistant", "content": "Please type one of the mood options:\n\n" + "\n".join(f"- {m}" for m in MOODS)})
                 st.rerun()
             user_input = matched
@@ -194,9 +185,13 @@ if not st.session_state.done:
 
             note_context = f" They shared: '{note}'" if note else ""
             ai_support = ask_gemini(
-                f"You are a warm eldercare companion. Write a short, caring emotional support message for "
-                f"{d['name']}, a {d['age']}-year-old who is feeling {d['mood']}.{note_context} "
-                f"Be gentle, empathetic, and uplifting. Suggest 1 simple activity. Keep it under 80 words."
+                f"You are a compassionate eldercare emotional support companion. "
+                f"Write a warm, personal support message for {d['name']}, "
+                f"a {d['age']}-year-old who is feeling {d['mood']}.{note_context} "
+                f"Acknowledge their feeling first, then offer 1 simple comforting activity "
+                f"and 1 gentle reminder that they are cared for. "
+                f"Keep it under 80 words. Be gentle, empathetic, and uplifting. "
+                f"Do not give medical advice."
             )
 
             breathing = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(BREATHING_STEPS))
@@ -228,6 +223,7 @@ if not st.session_state.done:
                 "Note": note if note else "-",
                 "Time": datetime.now().strftime("%H:%M:%S"),
             })
+            mood_to_exercise(d["name"], d["mood"], int(d["age"]))
 
             st.session_state.messages.append({"role": "assistant", "content": reply})
             st.session_state.done = True

@@ -7,213 +7,32 @@ import random
 import time
 from datetime import datetime
 import streamlit as st
+from shared.ui_components import init_theme, sidebar_nav, agent_header
+from shared.ui_theme import inject
 
-st.set_page_config(page_title="Emergency Detection Agent", layout="centered")
-
-st.markdown("""
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
-  html, body, [data-testid="stAppViewContainer"] {
-    background: #060b14 !important;
-    font-family: 'Inter', sans-serif;
-  }
-  [data-testid="stHeader"], footer, #MainMenu { display: none; }
-
-  .top-bar {
-    background: linear-gradient(135deg, #0d1a2e, #0a1220);
-    border: 1px solid #1a2840;
-    border-radius: 16px;
-    padding: 1.4rem 1.6rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .top-bar-icon {
-    width: 48px; height: 48px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #7f1d1d, #450a0a);
-    border: 1px solid #f87171;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.4rem;
-    box-shadow: 0 0 20px rgba(248,113,113,0.3);
-    flex-shrink: 0;
-  }
-
-  .top-bar-title { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; }
-  .top-bar-sub   { font-size: 0.78rem; color: #556677; margin-top: 0.2rem; }
-
-  .status-safe {
-    background: linear-gradient(135deg, #052e16, #041a0e);
-    border: 1px solid #166534;
-    border-radius: 14px;
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 1rem;
-    animation: fadeIn 0.4s ease;
-  }
-
-  .status-emergency {
-    background: linear-gradient(135deg, #450a0a, #2d0606);
-    border: 2px solid #f87171;
-    border-radius: 14px;
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 1rem;
-    animation: emergencyPulse 1s ease infinite;
-  }
-
-  .status-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-
-  .status-safe .status-label   { color: #4ade80; }
-  .status-emergency .status-label { color: #f87171; }
-
-  .status-text-safe      { font-size: 1.3rem; font-weight: 700; color: #4ade80; }
-  .status-text-emergency { font-size: 1.3rem; font-weight: 700; color: #f87171; }
-
-  .sensor-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-  }
-
-  .sensor-card {
-    background: #0d1526;
-    border: 1px solid #1a2840;
-    border-radius: 12px;
-    padding: 1rem 0.8rem;
-    text-align: center;
-    animation: fadeIn 0.4s ease;
-  }
-
-  .sensor-label {
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #445566;
-    margin-bottom: 0.4rem;
-  }
-
-  .sensor-value {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #dde8f5;
-  }
-
-  .sensor-value.danger { color: #f87171; }
-  .sensor-value.warn   { color: #fbbf24; }
-  .sensor-value.ok     { color: #4ade80; }
-
-  .log-container {
-    background: #0a0f1a;
-    border: 1px solid #1a2840;
-    border-radius: 14px;
-    padding: 1rem 1.2rem;
-    max-height: 260px;
-    overflow-y: auto;
-    font-family: 'Courier New', monospace;
-    font-size: 0.78rem;
-  }
-
-  .log-entry {
-    padding: 0.3rem 0;
-    border-bottom: 1px solid #0d1526;
-    animation: fadeIn 0.3s ease;
-  }
-
-  .log-time  { color: #334455; margin-right: 0.5rem; }
-  .log-safe  { color: #4ade80; }
-  .log-alert { color: #f87171; font-weight: 600; }
-  .log-info  { color: #60a5fa; }
-
-  .reading-counter {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: #0d1526;
-    border: 1px solid #1a2840;
-    border-radius: 999px;
-    padding: 0.3rem 0.9rem;
-    font-size: 0.72rem;
-    color: #556677;
-    margin-bottom: 1rem;
-  }
-
-  .pulse-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #22c55e;
-    animation: pulse 1.5s infinite;
-  }
-
-  .pulse-dot.red { background: #f87171; animation: pulseRed 0.6s infinite; }
-
-  .alert-banner {
-    background: linear-gradient(135deg, #7f1d1d, #450a0a);
-    border: 2px solid #f87171;
-    border-radius: 14px;
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 1rem;
-    text-align: center;
-    animation: emergencyPulse 0.8s ease infinite;
-  }
-
-  .alert-banner-title { font-size: 1.1rem; font-weight: 700; color: #fca5a5; letter-spacing: 0.05em; }
-  .alert-banner-sub   { font-size: 0.82rem; color: #f87171; margin-top: 0.3rem; }
-
-  .detail-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #0d1526;
-    font-size: 0.82rem;
-  }
-  .detail-key   { color: #445566; }
-  .detail-value { color: #dde8f5; font-weight: 600; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
-    50%       { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
-  }
-
-  @keyframes pulseRed {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.6); }
-    50%       { box-shadow: 0 0 0 6px rgba(248,113,113,0); }
-  }
-
-  @keyframes emergencyPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.3); }
-    50%       { box-shadow: 0 0 20px rgba(248,113,113,0.2); }
-  }
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Emergency Detection Agent", layout="wide")
+dark = init_theme()
+inject(dark)
+sidebar_nav(active_id="emergency")
+agent_header(
+    title="🚨 Emergency Detection Agent",
+    subtitle="ElderCare AI — Real-time fall and emergency monitoring",
+    accent="#f87171",
+)
 
 # --- Agent Logic ---
 
 def simulate_sensor():
-    is_emergency = random.random() < 0.3
-    if is_emergency:
+    """Simulate wearable sensor data. 30% chance of emergency."""
+    if random.random() < 0.3:
         return {"movement": "none", "posture": "lying", "time_on_ground": random.randint(21, 60)}
     return {
         "movement": random.choice(["none", "low", "high"]),
-        "posture": random.choice(["standing", "sitting"]),
+        "posture":  random.choice(["standing", "sitting"]),
         "time_on_ground": random.randint(0, 10),
     }
 
-def detect_fall(sensor):
+def detect_fall(sensor: dict) -> bool:
     return (
         sensor["posture"] == "lying"
         and sensor["movement"] == "none"
@@ -221,50 +40,29 @@ def detect_fall(sensor):
     )
 
 # --- Session State ---
-if "log" not in st.session_state:
-    st.session_state.log = []
-if "reading_count" not in st.session_state:
-    st.session_state.reading_count = 0
-if "last_sensor" not in st.session_state:
-    st.session_state.last_sensor = None
-if "last_emergency" not in st.session_state:
-    st.session_state.last_emergency = False
-if "monitoring" not in st.session_state:
-    st.session_state.monitoring = False
-
-# --- Header ---
-st.markdown("""
-<div class="top-bar">
-  <div class="top-bar-icon">🚨</div>
-  <div>
-    <div class="top-bar-title">Emergency Detection Agent</div>
-    <div class="top-bar-sub">ElderCare AI — Real-time fall and emergency monitoring</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+for _k, _v in {
+    "log": [], "reading_count": 0,
+    "last_sensor": None, "last_emergency": False, "monitoring": False,
+}.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
 # --- Controls ---
 col1, col2, col3 = st.columns([2, 2, 2])
 with col1:
     if st.button("Take Reading", use_container_width=True, type="primary"):
-        sensor = simulate_sensor()
+        sensor       = simulate_sensor()
         is_emergency = detect_fall(sensor)
-        ts = datetime.now().strftime("%H:%M:%S")
+        ts           = datetime.now().strftime("%H:%M:%S")
         st.session_state.reading_count += 1
-        st.session_state.last_sensor = sensor
+        st.session_state.last_sensor    = sensor
         st.session_state.last_emergency = is_emergency
-
-        log_entry = {
-            "time": ts,
-            "reading": st.session_state.reading_count,
-            "movement": sensor["movement"],
-            "posture": sensor["posture"],
-            "time_on_ground": sensor["time_on_ground"],
-            "emergency": is_emergency,
+        entry = {
+            "time": ts, "reading": st.session_state.reading_count,
+            "movement": sensor["movement"], "posture": sensor["posture"],
+            "time_on_ground": sensor["time_on_ground"], "emergency": is_emergency,
         }
-        st.session_state.log.insert(0, log_entry)
-        if len(st.session_state.log) > 30:
-            st.session_state.log = st.session_state.log[:30]
+        st.session_state.log = [entry] + st.session_state.log[:29]
 
 with col2:
     auto = st.toggle("Auto Monitor", value=st.session_state.monitoring)
@@ -383,23 +181,24 @@ if st.session_state.log:
 else:
     st.markdown('<div class="log-container"><span style="color:#334455;">No readings yet. Press Take Reading to begin.</span></div>', unsafe_allow_html=True)
 
-# --- Auto Monitor ---
+# --- Auto Monitor (non-blocking: timestamp-based) ---
 if st.session_state.monitoring:
-    time.sleep(5)
-    sensor = simulate_sensor()
-    is_emergency = detect_fall(sensor)
-    ts = datetime.now().strftime("%H:%M:%S")
-    st.session_state.reading_count += 1
-    st.session_state.last_sensor = sensor
-    st.session_state.last_emergency = is_emergency
-    st.session_state.log.insert(0, {
-        "time": ts,
-        "reading": st.session_state.reading_count,
-        "movement": sensor["movement"],
-        "posture": sensor["posture"],
-        "time_on_ground": sensor["time_on_ground"],
-        "emergency": is_emergency,
-    })
-    if len(st.session_state.log) > 30:
-        st.session_state.log = st.session_state.log[:30]
+    import time as _time
+    last_auto = st.session_state.get("_last_auto_ts", 0)
+    now_ts = _time.monotonic()
+    if now_ts - last_auto >= 3.0:
+        st.session_state["_last_auto_ts"] = now_ts
+        sensor       = simulate_sensor()
+        is_emergency = detect_fall(sensor)
+        ts           = datetime.now().strftime("%H:%M:%S")
+        st.session_state.reading_count += 1
+        st.session_state.last_sensor    = sensor
+        st.session_state.last_emergency = is_emergency
+        st.session_state.log = [{
+            "time": ts, "reading": st.session_state.reading_count,
+            "movement": sensor["movement"], "posture": sensor["posture"],
+            "time_on_ground": sensor["time_on_ground"], "emergency": is_emergency,
+        }] + st.session_state.log[:29]
+    # Use st.rerun with a short sleep only to avoid 100% CPU spin
+    _time.sleep(0.5)
     st.rerun()
